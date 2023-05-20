@@ -76,6 +76,4 @@ Contributions to `oci` are welcomed! Whether it's bug reports, feature requests,
 
 ## License
 
-`oci` is open source software [licensed as XXX].
-
-_NOTE: The specifics of the README would depend on the actual functionalities of your library and how it is expected to be used. Please fill in the XXX placeholders and modify the sections according to your needs._
+`oci` is open source software [licensed under BSD 3-Clause License].
