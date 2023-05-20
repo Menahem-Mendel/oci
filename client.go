@@ -16,14 +16,15 @@ Example usage:
 drv := oci.NewDriver()
 ctx := context.Background()
 client, err := oci.NewClient(ctx, drv, "localhost:5000")
-if err != nil {
-    log.Fatalf("Failed to create client: %v", err)
-}
+
+	if err != nil {
+	    log.Fatalf("Failed to create client: %v", err)
+	}
+
 defer client.Close()
 
 // ... use the client ...
 */
-
 package oci
 
 import (
