@@ -75,7 +75,7 @@ func (d *MyDriver) Handler(method string) oci.Handler {
 Then you can define handlers which have same signature as the HandlerFunc
 ```go
 var handlers map[string]oci.HandlerFunc{
-    string(oci.PULL): oci.HandlerFunc(PullHandler),
+    string(oci.PULL): oci.HandlerFunc(MyHandler),
 }
 
 func MyHandler(req *oci.Request) (*oci.Response, error) {
