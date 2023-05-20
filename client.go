@@ -1,3 +1,29 @@
+/*
+Package oci - Client
+
+Author: Menahem-Mendel Gelfand
+
+Copyright: Copyright 2023, Menahem-Mendel Gelfand
+
+License: This source code is licensed under the BSD 3-Clause License. You may obtain a copy of the License at:
+https://opensource.org/licenses/BSD-3-Clause
+
+This file contains the Client type in the oci package.
+A Client maintains a connection with an OCI and allows for sending requests and receiving responses.
+
+Example usage:
+
+drv := oci.NewDriver()
+ctx := context.Background()
+client, err := oci.NewClient(ctx, drv, "localhost:5000")
+if err != nil {
+    log.Fatalf("Failed to create client: %v", err)
+}
+defer client.Close()
+
+// ... use the client ...
+*/
+
 package oci
 
 import (
