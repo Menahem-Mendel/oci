@@ -6,7 +6,7 @@ import (
 )
 
 func Register(drv Driver) {
-
+	// drivers[drv.Name()] = drv
 }
 
 type Response struct {

@@ -3,15 +3,17 @@ package oci
 import "context"
 
 type Driver interface {
-	Connect(ctx context.Context, sock string) error
+	Connector
 
 	Handler(string) Handler
-
-	Close() error
 }
 
 type Conn interface {
 	Close() error
+}
+
+type Connector interface {
+	Connect(ctx context.Context, uri string) (Conn, error)
 }
 
 type Handler interface {

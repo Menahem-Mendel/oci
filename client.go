@@ -2,39 +2,67 @@ package oci
 
 import (
 	"context"
+	"errors"
+	"sync"
 )
 
 type Client struct {
 	driver Driver
+
+	conn Conn
+
+	sync.RWMutex
 }
 
-func NewClient(drv Driver) (*Client, error) {
+func NewClient(ctx context.Context, drv Driver, uri string) (*Client, error) {
+	conn, err := drv.Connect(ctx, uri)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
 		driver: drv,
+		conn:   conn,
 	}, nil
-}
 
-func (c *Client) Connect(ctx context.Context, sock string) error {
-	return c.driver.Connect(ctx, sock)
 }
 
 func (c *Client) Close() error {
-	return c.driver.Close()
+	c.Lock()
+	defer c.Unlock()
+
+	if c.conn == nil {
+		return nil
+	}
+
+	err := c.conn.Close()
+	c.conn = nil
+	return err
 }
 
 func (c *Client) Do(req *Request) (*Response, error) {
+	c.RLock()
+	defer c.RUnlock()
+
+	if c.conn == nil {
+		return nil, errors.New("No connection established")
+	}
+
+	return c.do(req)
+}
+
+func (c *Client) do(req *Request) (*Response, error) {
 	return c.driver.Handler(req.Method).ServeOCI(req)
 }
 
-func (c *Client) Pull(ref string) (*Response, error) {
+func (c *Client) Pull(ctx context.Context, ref string) (*Response, error) {
 	method := PULL
 
 	req := &Request{
-		ctx:    context.Background(),
 		Method: string(method),
 		Ref:    ref,
 		Kind:   "IMAGE",
 	}
 
-	return c.driver.Handler(string(method)).ServeOCI(req)
+	return c.Do(req)
 }
