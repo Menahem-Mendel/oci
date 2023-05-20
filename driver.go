@@ -1,29 +1,21 @@
-/*
-Package oci - Driver
+// Copyright 2023, Menahem-Mendel Gelfand. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
-Author: Menahem-Mendel Gelfand
+// This file contains the definitions for the Driver interface and related types in the oci package.
+// A Driver is the core interface in this package and is designed to enable interaction with different OCI implementations.
 
-Copyright: Copyright 2023, Menahem-Mendel Gelfand
+// Example usage:
 
-License: This source code is licensed under the BSD 3-Clause License. You may obtain a copy of the License at:
-https://opensource.org/licenses/BSD-3-Clause
-
-This file contains the definitions for the Driver interface and related types in the oci package.
-A Driver is the core interface in this package and is designed to enable interaction with different OCI implementations.
-
-Example usage:
-
-drv := oci.NewDriver()
-ctx := context.Background()
-conn, err := drv.Connect(ctx, "localhost:5000")
-if err != nil {
-    log.Fatalf("Failed to connect: %v", err)
-}
-defer conn.Close()
-
-// ... use the conn ...
-*/
-
+// drv := oci.NewDriver()
+// ctx := context.Background()
+// conn, err := drv.Connect(ctx, "localhost:5000")
+//
+//	if err != nil {
+//	   log.Fatalf("Failed to connect: %v", err)
+//	}
+//
+// defer conn.Close()
 package oci
 
 import "context"

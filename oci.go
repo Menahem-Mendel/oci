@@ -1,12 +1,9 @@
+// Copyright 2023, Menahem-Mendel Gelfand. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
 /*
-Package oci - Main
-
-Author: Menahem-Mendel Gelfand
-
-Copyright: Copyright 2023, Menahem-Mendel Gelfand
-
-License: This source code is licensed under the BSD 3-Clause License. You may obtain a copy of the License at:
-https://opensource.org/licenses/BSD-3-Clause
+Package oci
 
 This file is the main entry point for the oci package. It contains definitions for core types such as Request and Response, as well as the main interfaces and functions used to interact with the package.
 
@@ -16,23 +13,25 @@ Example usage:
 
 drv := oci.NewDriver()
 ctx := context.Background()
-client, err := oci.NewClient(ctx, drv, "localhost:5000")
-if err != nil {
-    log.Fatalf("Failed to create client: %v", err)
-}
+client, err := oci.NewClient(ctx, drv, "unix:///var/run/docker.sock")
+
+	if err != nil {
+	    log.Fatalf("Failed to create client: %v", err)
+	}
+
 defer client.Close()
 
 req := oci.NewRequest(ctx, oci.PULL, "nginx:latest", "", "IMAGE", nil)
 res, err := client.Do(req)
-if err != nil {
-    log.Fatalf("Failed to pull image: %v", err)
-}
+
+	if err != nil {
+	    log.Fatalf("Failed to pull image: %v", err)
+	}
+
 defer res.Body.Close()
 
 // ... handle the response ...
-
 */
-
 package oci
 
 import (

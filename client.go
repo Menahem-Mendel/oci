@@ -1,30 +1,22 @@
-/*
-Package oci - Client
+// Copyright 2023, Menahem-Mendel Gelfand. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
 
-Author: Menahem-Mendel Gelfand
+// This file contains the Client type in the oci package.
+// A Client maintains a connection with an OCI and allows for sending requests and receiving responses.
 
-Copyright: Copyright 2023, Menahem-Mendel Gelfand
+// Example usage:
 
-License: This source code is licensed under the BSD 3-Clause License. You may obtain a copy of the License at:
-https://opensource.org/licenses/BSD-3-Clause
-
-This file contains the Client type in the oci package.
-A Client maintains a connection with an OCI and allows for sending requests and receiving responses.
-
-Example usage:
-
-drv := oci.NewDriver()
-ctx := context.Background()
-client, err := oci.NewClient(ctx, drv, "localhost:5000")
-
-	if err != nil {
-	    log.Fatalf("Failed to create client: %v", err)
-	}
-
-defer client.Close()
-
-// ... use the client ...
-*/
+// drv := oci.NewDriver()
+// ctx := context.Background()
+// client, err := oci.NewClient(ctx, drv, "localhost:5000")
+//
+//	if err != nil {
+//	    log.Fatalf("Failed to create client: %v", err)
+//	}
+//
+// defer client.Close()
+// // ... use the client ...
 package oci
 
 import (
