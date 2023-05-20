@@ -1,2 +1,2 @@
 # oci
-a generic interface around OCI based runtime engines via drivers
+a generic driver interface around OCI based runtime engines
