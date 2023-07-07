@@ -36,65 +36,49 @@ package oci
 
 import (
 	"context"
-	"io"
+	"oci/driver"
+	"oci/runtime"
+	"sync"
 )
 
-// Register registers an OCI driver by its name. Currently not implemented.
-func Register(drv Driver) {
-	// drivers[drv.Name()] = drv
-}
+var (
+	driversMu sync.RWMutex
+	drivers   = make(map[string]driver.Driver)
+)
 
-// Response represents an OCI response with a body that can be read and closed.
-type Response struct {
-	// Body is the body of the response. It can be read and should be closed after reading.
-	Body io.ReadCloser
-}
+func Register(name string, driver driver.Driver) {
+	driversMu.Lock()
+	defer driversMu.Unlock()
 
-// NewResponse creates a new Response with the given body.
-// If the body is not already an io.ReadCloser, it wraps it with io.NopCloser.
-func NewResponse(body io.Reader) *Response {
-	rc, ok := body.(io.ReadCloser)
-	if !ok && body != nil {
-		rc = io.NopCloser(body)
+	if driver == nil {
+		panic("oci: Register driver is nil")
 	}
 
-	return &Response{
-		Body: rc,
-	}
-}
-
-// Request represents an OCI request with a method, a reference, an ID, a kind, a body, and a context.
-type Request struct {
-	Method string          // Method is the OCI method to use for this request.
-	Ref    string          // Ref is the reference to the OCI object.
-	ID     string          // ID is an optional ID for the OCI object.
-	Kind   string          // Kind is the kind of the OCI object.
-	Body   io.ReadCloser   // Body is the body of the request. It can be read and should be closed after reading.
-	ctx    context.Context // ctx is the context of this request. It can be used to cancel the request.
-}
-
-// NewRequest creates a new Request with the given parameters.
-// If the body is not already an io.ReadCloser, it wraps it with io.NopCloser.
-func NewRequest(ctx context.Context, method, ref, id, kind string, body io.Reader) *Request {
-	// TODO: if method is valid
-
-	// TODO: if reference is OCI valid
-
-	rc, ok := body.(io.ReadCloser)
-	if !ok && body != nil {
-		rc = io.NopCloser(body)
+	if _, dup := drivers[name]; dup {
+		panic("oci: Register called twice for driver " + name)
 	}
 
-	return &Request{
-		ctx:    ctx,
-		Method: method,
-		Ref:    ref,
-		Kind:   kind,
-		Body:   rc,
-	}
+	drivers[name] = driver
 }
 
-// Context returns the context of this request. Use this to cancel the request.
-func (r *Request) Context() context.Context {
-	return r.ctx
+func Open(ctx context.Context, driver, uri string) (*runtime.Runtime, error) {
+	driversMu.RLock()
+	drv, ok := drivers[driver]
+	delete(drivers, driver)
+	driversMu.RUnlock()
+	if !ok {
+		return nil, ErrUnregisteredDriver
+	}
+
+	r, err := runtime.New(ctx, drv)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = r.Open(ctx, uri)
+	if err != nil {
+		return nil, err
+	}
+
+	return r, nil
 }

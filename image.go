@@ -6,26 +6,30 @@
 // An Image represents a specific OCI image and provides methods for interacting with it.
 package oci
 
-import (
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
-)
+import "oci/driver"
 
-type Image v1.Image
+// type Image v1.Image
 
-func NewImage() *Image { return new(Image) }
+// func NewImage() *Image { return new(Image) }
 
-type ImageConfig v1.ImageConfig
+// type ImageConfig v1.ImageConfig
 
-type ImageLayoutj v1.ImageLayout
+// type ImageLayout v1.ImageLayout
 
-type Descriptor v1.Descriptor
+// type Descriptor v1.Descriptor
 
-type History v1.History
+// type History v1.History
 
-type Index v1.Index
+// type Index v1.Index
 
-type Manifest v1.Manifest
+// type Manifest v1.Manifest
 
-type Platform v1.Platform
+// type Platform v1.Platform
 
-type RootFS v1.RootFS
+// type RootFS v1.RootFS
+
+type Image struct {
+	driver driver.Driver
+}
+
+func (i *Image) Driver() driver.Driver { return i.driver }
