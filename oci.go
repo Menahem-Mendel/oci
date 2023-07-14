@@ -11,24 +11,7 @@ The oci package provides a driver interface for interacting with different OCI (
 
 Example usage:
 
-drv := oci.NewDriver()
-ctx := context.Background()
-client, err := oci.NewClient(ctx, drv, "unix:///var/run/docker.sock")
-
-	if err != nil {
-	    log.Fatalf("Failed to create client: %v", err)
-	}
-
-defer client.Close()
-
-req := oci.NewRequest(ctx, oci.PULL, "nginx:latest", "", "IMAGE", nil)
-res, err := client.Do(req)
-
-	if err != nil {
-	    log.Fatalf("Failed to pull image: %v", err)
-	}
-
-defer res.Body.Close()
+// TODO: Add example usage.
 
 // ... handle the response ...
 */
@@ -51,7 +34,7 @@ func Register(name string, driver driver.Driver) {
 	defer driversMu.Unlock()
 
 	if driver == nil {
-		panic("oci: Register driver is nil")
+		panic("oci: Register nil driver")
 	}
 
 	if _, dup := drivers[name]; dup {
@@ -61,24 +44,63 @@ func Register(name string, driver driver.Driver) {
 	drivers[name] = driver
 }
 
-func Open(ctx context.Context, driver, uri string) (*runtime.Runtime, error) {
+func Runtime(driver string) (*runtime.Runtime, error) {
 	driversMu.RLock()
 	drv, ok := drivers[driver]
-	delete(drivers, driver)
 	driversMu.RUnlock()
 	if !ok {
 		return nil, ErrUnregisteredDriver
 	}
 
-	r, err := runtime.New(ctx, drv)
-	if err != nil {
-		return nil, err
-	}
-
-	_, err = r.Open(ctx, uri)
+	r, err := runtime.New(drv)
 	if err != nil {
 		return nil, err
 	}
 
 	return r, nil
+}
+
+type Configer interface {
+	Set(key string, value any) error
+	Get(key string) (any, error)
+}
+
+func Open(ctx context.Context, runtime driver.Driver, uri string) (driver.Conn, error) {
+	return runtime.Open(ctx, uri)
+}
+
+func Pull(ctx context.Context, p driver.Puller, ref string) (string, error) {
+	return p.Pull(ctx, ref)
+}
+
+func Push(ctx context.Context, p driver.Pusher, ref, id string) error {
+	return p.Push(ctx, ref, id)
+}
+
+func Stat(ctx context.Context, conf Configer, s driver.Inspector, id string) error {
+	return s.Stat(ctx, conf, id)
+}
+
+func List(ctx context.Context, conf []Configer, l driver.Lister) error {
+	return l.List(ctx, conf)
+}
+
+func Create(ctx context.Context, c driver.Creator, id string, args ...string) (string, error) {
+	return c.Build(ctx)
+}
+
+func Start(ctx context.Context, s driver.Starter, id string) error {
+	return s.Start(ctx, id)
+}
+
+func Stop(ctx context.Context, s driver.Stoper, id string) error {
+	return s.Stop(ctx, id)
+}
+
+func Pause(ctx context.Context, p driver.Pauser, id string) error {
+	return p.Pause(ctx, id)
+}
+
+func Kill(ctx context.Context, k driver.Killer, id string) error {
+	return k.Kill(ctx, id)
 }

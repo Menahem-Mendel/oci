@@ -5,15 +5,16 @@ package images
 
 import (
 	"context"
+	"encoding/json"
 	"oci"
 	"oci/driver"
-	"sync"
 	"time"
 
 	"github.com/opencontainers/go-digest"
 )
 
 type Conf struct {
+	ID            string
 	Architecture  string
 	Author        string
 	DockerVersion string
@@ -37,45 +38,117 @@ type Layer struct {
 	Size        int64  // -1 if unknown.
 }
 
-type service struct {
-	runtime driver.Driver
+func NewConf(drv driver.Driver, opts ...driver.Option) (driver.Configer, error) {
+	conf, _ := drv.Configer("images")
 
-	mu sync.Mutex
-}
-
-func Handle(ctx context.Context, h driver.Handler) error {
-	return h.ServeOCI(ctx)
-}
-
-func HandleFunc(ctx context.Context, f func(context.Context) error) error {
-	return Handle(ctx, driver.HandlerFunc(f))
-}
-
-// func Stat(ctx context.Context, s driver.Server, id string) (image *Conf, err error) {
-// 	return nil, err
-// }
-
-func Pull(ctx context.Context, r driver.Driver, ref string) (id string, err error) {
-	p := puller{
-		r:   r,
-		ref: ref,
+	for range opts {
+		// if err := opt.Apply(conf); err == oci.ErrUnsupportedOption {
+		// 	// TODO: should return the first unsupported error.
+		// 	return nil, err
+		// } else if err != nil {
+		// 	return nil, err
+		// }
 	}
 
-	is, err := r.Service("image")
+	return conf, nil
+}
+
+func (c *Conf) Apply(v any) error {
+	c, ok := v.(*Conf)
+	if !ok {
+		// return oci.ErrUnknownConf
+		return nil
+	}
+
+	return nil
+}
+
+func WithArch(arch string) driver.ArchOption {
+	return driver.OptionFunc(func(conf driver.Configer) error {
+		// conf.Set(arch)
+		// return oci.ErrUnsupportedOption
+		return nil
+	})
+}
+
+func imageService(conn driver.Conn) (any, error) {
+	imgsrv, err := conn.Prepare("images")
+	if err != nil {
+		return nil, err
+	}
+
+	return imgsrv, nil
+}
+
+func imagePuller(imgsrv any) (driver.Puller, error) {
+	p, ok := imgsrv.(driver.Puller)
+	if !ok {
+		return nil, oci.ErrUnsupportedOperation
+	}
+
+	return p, nil
+}
+
+func Pull(ctx context.Context, conn driver.Conn, ref string) (id string, err error) {
+	s, err := imageService(conn)
 	if err != nil {
 		return "", err
 	}
 
-	r.ServeOCI(ctx, p)
-	return "", nil
+	p, err := imagePuller(s)
+	if err != nil {
+		return "", err
+	}
+
+	return oci.Pull(ctx, p, ref)
 }
 
-type puller struct {
-	r oci.Runtime
+func imagePusher(imgsrv any) (driver.Pusher, error) {
+	p, ok := imgsrv.(driver.Pusher)
+	if !ok {
+		return nil, oci.ErrUnsupportedOperation
+	}
 
-	ref string
+	return p, nil
 }
 
-func (p puller) ServeOCI(ctx context.Context) error {
-	return p.p.Pull(ctx, p.Name)
+func Push(ctx context.Context, conn driver.Conn, ref, id string) error {
+	s, err := imageService(conn)
+	if err != nil {
+		return err
+	}
+
+	p, err := imagePusher(s)
+	if err != nil {
+		return err
+	}
+
+	return oci.Push(ctx, p, ref, id)
+}
+
+func Stat(ctx context.Context, conn driver.Conn, id string) (image *Conf, err error) {
+	s, err := imageService(conn)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := imagePusher(s)
+	if err != nil {
+		return nil, err
+	}
+
+	c, err := oci.Stat(ctx, p, ref, id)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := jsonUnmarshal(c, &image); err != nil {
+		return nil, err
+	}
+
+	return image, nil
+}
+
+func jsonUnmarshal(data []byte, v any) error {
+	return json.Unmarshal(data, v)
 }

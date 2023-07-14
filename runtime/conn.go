@@ -19,6 +19,6 @@ func (c *Conn) Begin(ctx context.Context) error {
 	return nil
 }
 
-// func (c *Conn) Prepare(service string) (io.ReadWriteCloser, driver.ParserFunc, error) {
-// 	return nil, nil, nil
-// }
+func (c *Conn) Prepare(service string) (any, error) {
+	return nil, nil
+}

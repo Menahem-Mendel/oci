@@ -9,8 +9,6 @@ package driver
 import (
 	"context"
 	"io"
-	"net"
-	"os"
 )
 
 // Driver is an interface that defines the behavior of components that
@@ -20,10 +18,6 @@ import (
 // the details of the connection process and providing a unified way of
 // managing these connections across different runtimes.
 type Driver interface {
-	Connector
-}
-
-type Connector interface {
 	// Open method is responsible for establishing a new connection to a
 	// container manager daemon, using the provided context and uri parameters.
 	//
@@ -48,6 +42,8 @@ type Connector interface {
 	// error should be descriptive enough to allow callers to understand what went
 	// wrong and possibly make informed decisions about error handling and recovery.
 	Open(ctx context.Context, uri string) (Conn, error)
+
+	Configer(service string) (Configer, bool)
 }
 
 // Conn represents a connection to a container runtime management daemon.
@@ -122,13 +118,7 @@ type Conn interface {
 	//
 	// Note: The specific behavior and the kind of data that needs to be written or read
 	// depends on the implementation of the specific service.
-	// Prepare(service string) (io.ReadWriteCloser, ParserFunc, error)
-}
-
-type Listener interface {
-	Listen(ctx context.Context, cid string) (net.Conn, error)
-
-	Close() error
+	Prepare(service string) (any, error)
 }
 
 // type ImageParserFunc func(r io.Reader) (ImageInfo, error)
@@ -212,11 +202,17 @@ type Pusher interface {
 }
 
 type Creator interface {
-	Create(ctx context.Context, id string) (resID string, err error)
+	Build(ctx context.Context) (id string, err error)
 }
 
 type Starter interface {
 	Start(ctx context.Context, id string) error
+}
+
+// INFO: maybe should just use Closer interface
+
+type Pauser interface {
+	Pause(ctx context.Context, id string) error
 }
 
 type Stoper interface {
@@ -224,11 +220,39 @@ type Stoper interface {
 }
 
 type Killer interface {
-	Kill(ctx context.Context, id string, signal os.Signal) error
+	Kill(ctx context.Context, id string) error
 }
+
+// INFO
 
 type Mounter interface {
 	Mount(ctx context.Context, id string, target string) error
+}
+
+type ArchOption Option
+
+type WithArch func(arch string) Option
+
+type WithCDIDevice func(name string) Option
+
+type Option interface {
+	Apply(conf Configer) error
+}
+
+type OptionFunc func(v Configer) error
+
+func (o OptionFunc) Apply(v Configer) error {
+	return o(v)
+}
+
+type Configer interface {
+	Set(key string, val any) error
+}
+
+type ConfigerFunc func(v any) error
+
+func (o ConfigerFunc) Apply(v any) error {
+	return o(v)
 }
 
 type HandlerFunc func(ctx context.Context) error
@@ -245,19 +269,8 @@ type Limiter interface {
 	Limit(limit int) error
 }
 
-type Option interface {
-	Apply(n int) ([]byte, error)
-}
-
-// Service could be image, container, network, namespace etc.
-type Service interface {
-	Inspector
-	Lister
-	Remover
-}
-
 type Lister interface {
-	List(ctx context.Context) ([]Inspector, error)
+	List(ctx context.Context, v []any) error
 }
 
 type Remover interface {
@@ -265,7 +278,7 @@ type Remover interface {
 }
 
 type Inspector interface {
-	Stat(ctx context.Context, id string, v any) (b []byte, err error)
+	Stat(ctx context.Context, v any, id string) error
 }
 
 // Execer is an interface that abstracts the operation of executing commands within the context
@@ -292,12 +305,6 @@ type Execer interface {
 	Exec(ctx context.Context, cmd string, args ...string) error
 }
 
-// type StdioStreamer interface {
-// 	StdinWriter
-// 	StdoutReader
-// 	StderrReader
-// }
-
 type StdinWriter interface {
 	StdinPipe(ctx context.Context) (io.WriteCloser, error)
 }
@@ -309,82 +316,3 @@ type StdoutReader interface {
 type StderrReader interface {
 	StderrPipe(ctx context.Context) (io.ReadCloser, error)
 }
-
-// type Stdin struct {
-// 	in io.Writer
-
-// 	cancel func()
-
-// 	mu     sync.Mutex
-// 	closed bool
-// }
-
-// func (s *Stdin) Write(p []byte) (n int, err error) {
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-
-// 	if s.closed {
-// 		return 0, errors.New("write to closed stdin")
-// 	} else if s.in == nil {
-// 		return 0, errors.New("stdin not initialized")
-// 	}
-
-// 	return s.in.Write(p)
-// }
-
-// func (s *Stdin) Close() error {
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-
-// 	if s.closed {
-// 		return errors.New("stdin already closed")
-// 	}
-
-// 	s.closed = true
-// 	s.cancel()
-// 	return nil
-// }
-
-// type Stdout struct {
-// 	out io.Reader
-
-// 	cancel func()
-
-// 	mu     sync.Mutex
-// 	closed bool
-// }
-
-// func (s *Stdout) Read(p []byte) (n int, err error) {
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-
-// 	if s.closed {
-// 		return 0, errors.New("read from closed stdout")
-// 	} else if s.out == nil {
-// 		return 0, errors.New("stdout not initialized")
-// 	}
-
-// 	return s.out.Read(p)
-// }
-
-// func (s *Stdout) Close() error {
-// 	s.mu.Lock()
-// 	defer s.mu.Unlock()
-
-// 	if s.closed {
-// 		return errors.New("stdout already closed")
-// 	}
-
-// 	s.closed = true
-// 	s.cancel()
-// 	return nil
-// }
-
-// type Stderr struct {
-// 	out io.Reader
-
-// 	cancel func()
-
-// 	mu     sync.Mutex
-// 	closed bool
-// }
