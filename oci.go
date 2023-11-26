@@ -20,7 +20,6 @@ package oci
 import (
 	"context"
 	"oci/driver"
-	"oci/runtime"
 	"sync"
 )
 
@@ -44,7 +43,7 @@ func Register(name string, driver driver.Driver) {
 	drivers[name] = driver
 }
 
-func Runtime(driver string) (*runtime.Runtime, error) {
+func NewRuntime(driver string) (*Runtime, error) {
 	driversMu.RLock()
 	drv, ok := drivers[driver]
 	driversMu.RUnlock()
@@ -52,12 +51,10 @@ func Runtime(driver string) (*runtime.Runtime, error) {
 		return nil, ErrUnregisteredDriver
 	}
 
-	r, err := runtime.New(drv)
-	if err != nil {
-		return nil, err
-	}
-
-	return r, nil
+	// _, cancel := context.WithCancel(ctx)
+	return &Runtime{
+		// cancel: cancel,
+	}, nil
 }
 
 type Configer interface {

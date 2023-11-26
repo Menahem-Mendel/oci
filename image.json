@@ -1,0 +1,72 @@
+{
+    "Id": "a6bd71f48f6839d9faae1f29d3babef831e76bc213107682c5cc80f0cbb30866",
+    "Digest": "sha256:10d1f5b58f74683ad34eb29287e07dab1e90f10af243f151bb50aa5dbb4d62ee",
+    "RepoTags": [
+        "docker.io/library/nginx:latest"
+    ],
+    "RepoDigests": [
+        "docker.io/library/nginx@sha256:10d1f5b58f74683ad34eb29287e07dab1e90f10af243f151bb50aa5dbb4d62ee",
+        "docker.io/library/nginx@sha256:3c4c1f42a89e343c7b050c5e5d6f670a0e0b82e70e0e7d023f10092a04bbb5a7"
+    ],
+    "Parent": "",
+    "Comment": "",
+    "Created": "2023-11-21T09:05:32.482668371Z",
+    "Config": {
+        "ExposedPorts": {
+            "80/tcp": {}
+        },
+        "Env": [
+            "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+            "NGINX_VERSION=1.25.3",
+            "NJS_VERSION=0.8.2",
+            "PKG_RELEASE=1~bookworm"
+        ],
+        "Entrypoint": [
+            "/docker-entrypoint.sh"
+        ],
+        "Cmd": [
+            "nginx",
+            "-g",
+            "daemon off;"
+        ],
+        "Labels": {
+            "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>"
+        },
+        "StopSignal": "SIGQUIT"
+    },
+    "Version": "20.10.23",
+    "Author": "",
+    "Architecture": "amd64",
+    "Os": "linux",
+    "Size": 190960382,
+    "VirtualSize": 190960382,
+    "GraphDriver": {
+        "Name": "overlay",
+        "Data": {
+            "LowerDir": "/home/mendel/.local/share/containers/storage/overlay/a36e80b472de0655c98ba7d2f47f4fc82a7c391c83edc5978c72c8087ae83eb6/diff:/home/mendel/.local/share/containers/storage/overlay/3e6b907b39c4baf584f14198f799b7eceb096554882523722bb17563ce8da7dc/diff:/home/mendel/.local/share/containers/storage/overlay/16caae5ce3c4533554c10888bae35bf191419273f6642ad9a9a5203334c426d3/diff:/home/mendel/.local/share/containers/storage/overlay/38ec89bdc11a2b110c1bf8568a1243445a0a653b59c8936a528fe9ac5c218442/diff:/home/mendel/.local/share/containers/storage/overlay/4f196dd30961ec3e9e6fc2ba313619cf4a28188ec2ab8ab6bbfa673cbb3013c4/diff:/home/mendel/.local/share/containers/storage/overlay/92770f546e065c4942829b1f0d7d1f02c2eb1e6acf0d1bc08ef0bf6be4972839/diff",
+            "UpperDir": "/home/mendel/.local/share/containers/storage/overlay/0f9e507effe2253146638f194407f79d4c228a780848730b0d3e72fcf38a2109/diff",
+            "WorkDir": "/home/mendel/.local/share/containers/storage/overlay/0f9e507effe2253146638f194407f79d4c228a780848730b0d3e72fcf38a2109/work"
+        }
+    },
+    "RootFS": {
+        "Type": "layers",
+        "Layers": [
+            "sha256:92770f546e065c4942829b1f0d7d1f02c2eb1e6acf0d1bc08ef0bf6be4972839",
+            "sha256:8ae474e0cc8f5a81405b04143604f78bfac4756c523e276a36921a8c4da36567",
+            "sha256:f5525891d9e9b43a95b4aa1f79405087922489eb300864a2683262aae0fa5b3a",
+            "sha256:66283570f41bca3619443d121a79e810b8a72849b5329319993e538d563b3e2f",
+            "sha256:c2d3ab485d1b375fdd309458d69d93f8eb9aba8472e928efa32d9e5eda631440",
+            "sha256:cddc309885a283a35ef142af78bc6f2e9c9db10e1981c4ea9cfb2c00b83e68ff",
+            "sha256:0d0e9c83b6f775d68c7517aabf39ec9123ffca29672e3c3f83c5af7fc6aa242b"
+        ]
+    },
+    "Labels": {
+        "maintainer": "NGINX Docker Maintainers <docker-maint@nginx.com>"
+    },
+    "Annotations": {},
+    "ManifestType": "application/vnd.docker.distribution.manifest.v2+json",
+    "User": "",
+    "NamesHistory": [
+        "docker.io/library/nginx:latest"
+    ]
+}

@@ -201,7 +201,7 @@ type Pusher interface {
 	Push(ctx context.Context, ref, id string) error
 }
 
-type Creator interface {
+type Builder interface {
 	Build(ctx context.Context) (id string, err error)
 }
 
