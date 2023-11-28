@@ -9,6 +9,9 @@ package driver
 import (
 	"context"
 	"io"
+	"time"
+
+	"github.com/opencontainers/go-digest"
 )
 
 // Driver is an interface that defines the behavior of components that
@@ -278,7 +281,7 @@ type Remover interface {
 }
 
 type Inspector interface {
-	Stat(ctx context.Context, v any, id string) error
+	Stat(ctx context.Context, id string) (map[string]any, error)
 }
 
 // Execer is an interface that abstracts the operation of executing commands within the context
@@ -315,4 +318,28 @@ type StdoutReader interface {
 
 type StderrReader interface {
 	StderrPipe(ctx context.Context) (io.ReadCloser, error)
+}
+
+type Image interface {
+	ID() string
+	Arch() string
+	Auth() string
+	Name() string
+	OS() string
+	Tag() string
+	Variant() string
+	ENV() []string
+	Layers() []string
+	RepoTags() []string
+	Created() *time.Time
+	Digest() digest.Digest
+	Labels() map[string]string
+	LayersData() []Layer
+}
+
+type Layer interface {
+	Annotations() map[string]string
+	Digest() digest.Digest
+	MIMEType() string // "" if unknown.
+	Size() int64      // -1 if unknown.
 }

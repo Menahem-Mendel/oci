@@ -18,8 +18,8 @@ func main() {
 	conn, _ := rt.Open(context.Background(), "unix:///var/run/podman.sock")
 	defer conn.Close()
 
-	img, _ := image.Pull(context.Background(), conn, "docker.io/library/nginx:latest")
-	_ = img
+	imageID, _ := image.Pull(context.Background(), conn, "docker.io/library/nginx:latest")
+	img, _ := image.Inspect(context.Background(), conn, imageID)
 	networkID, _ := net.Build(context.Background(), conn)
 	namespaceID, _ := namespace.Build(context.Background(), conn)
 
