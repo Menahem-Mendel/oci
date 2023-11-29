@@ -14,6 +14,12 @@ import (
 	"github.com/opencontainers/go-digest"
 )
 
+type ServiceType string
+
+var (
+	ImageService ServiceType = "image"
+)
+
 // Driver is an interface that defines the behavior of components that
 // establish connections with container runtime management daemons. The
 // implementations of this interface allow the application to interact with
@@ -44,9 +50,15 @@ type Driver interface {
 	// non-nil error that provides details about the reason of the failure. The
 	// error should be descriptive enough to allow callers to understand what went
 	// wrong and possibly make informed decisions about error handling and recovery.
-	Open(ctx context.Context, uri string) (Conn, error)
+	Op
+}
 
-	Configer(service string) (Configer, bool)
+type Runtime struct {
+	Services map[ServiceType]Service
+}
+
+func Register() Driver {
+
 }
 
 // Conn represents a connection to a container runtime management daemon.
@@ -122,6 +134,12 @@ type Conn interface {
 	// Note: The specific behavior and the kind of data that needs to be written or read
 	// depends on the implementation of the specific service.
 	Prepare(service string) (any, error)
+
+	Driver() Driver
+}
+
+type Service interface {
+	Operations(r Request) []any
 }
 
 // type ImageParserFunc func(r io.Reader) (ImageInfo, error)
@@ -171,6 +189,8 @@ type Puller interface {
 	// data stream), context errors (the pull operation being cancelled or timing out), or domain-specific
 	// errors (e.g., the resource not being found in the remote registry).
 	Pull(ctx context.Context, ref string) (id string, err error)
+
+	Reference() string
 }
 
 // Pusher is an interface that abstracts the operation of pushing an OCI resource, such as an image,

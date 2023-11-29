@@ -5,46 +5,62 @@ package image
 
 import (
 	"context"
-	"encoding/json"
 	"oci"
 	"oci/driver"
 )
 
-func imageService(conn driver.Conn) (any, error) {
-	imgsrv, err := conn.Prepare("image")
-	if err != nil {
-		return nil, err
-	}
-
-	return imgsrv, nil
+type Service struct {
+	Puller driver.Puller
 }
 
-func puller(s any) (driver.Puller, error) {
-	p, ok := s.(driver.Puller)
-	if !ok {
-		return nil, oci.ErrUnsupportedOperation
-	}
-
-	return p, nil
+type service struct {
 }
+
+// func imageService(conn driver.Conn) (any, error) {
+// 	imgsrv, err := conn.Prepare("image")
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return imgsrv, nil
+// }
+
+// func puller(s any) (driver.Puller, error) {
+// 	p, ok := s.(driver.Puller)
+// 	if !ok {
+// 		return nil, oci.ErrUnsupportedOperation
+// 	}
+
+// 	return p, nil
+// }
+
+// func Pull(ctx context.Context, conn driver.Conn, ref string) (string, error) {
+// 	s, _ := imageService(conn)
+// 	p, _ := puller(s)
+
+// 	return oci.Pull(ctx, p, ref)
+// }
 
 func Pull(ctx context.Context, conn driver.Conn, ref string) (string, error) {
-	s, _ := imageService(conn)
-	p, _ := puller(s)
+	var p driver.Puller
+
+	conn.Prepare()
 
 	return oci.Pull(ctx, p, ref)
 }
 
-func Stat(ctx context.Context, conn driver.Conn, id string) (image *Image, err error) {
-	s, _ := imageService(conn)
-	p, _ := imagePusher(s)
-	c, _ := oci.Stat(ctx, p, ref, id)
+func pull(ctx context.Context, p driver.Puller, ref string) {
 
-	_ = jsonUnmarshal(c, &image)
-
-	return
 }
 
-func jsonUnmarshal(data []byte, v any) error {
-	return json.Unmarshal(data, v)
+type image struct {
+	drv driver.Driver
+
+	conn driver.Conn
+}
+
+func (p *image) Pull(ctx context.Context, ref string) (id string, err error) {
+	p.conn.Driver()
+
+	return
 }

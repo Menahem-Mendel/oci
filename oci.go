@@ -26,9 +26,10 @@ import (
 var (
 	driversMu sync.RWMutex
 	drivers   = make(map[string]driver.Driver)
+	services  = make(map[driver.Driver]string)
 )
 
-func Register(name string, driver driver.Driver) {
+func Register(name string, driver driver.Driver, services ...any) {
 	driversMu.Lock()
 	defer driversMu.Unlock()
 

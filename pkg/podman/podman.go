@@ -29,7 +29,9 @@ import (
 )
 
 func init() {
-	oci.Register("podman", nil)
+	var is *imageService
+	var p *Podman
+	oci.Register("podman", p, is)
 }
 
 type Podman struct {
@@ -50,7 +52,12 @@ func (p *Podman) Open(ctx context.Context, uri string) (driver.Conn, error) {
 	}
 	_ = conn
 
-	return &Conn{}, nil
+	return nil, nil
+}
+
+func (p *Podman) Puller(service driver.Puller) {
+	var img *imageService
+	service = img
 }
 
 type UnixRoundTripper struct {
@@ -175,6 +182,10 @@ type imageService struct {
 	name string
 
 	conn *bindings.Connection
+}
+
+func (i *imageService) Init(p driver.Puller) {
+	p = i
 }
 
 func (i *imageService) Pull(ctx context.Context, ref string) (int, error) {
