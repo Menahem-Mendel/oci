@@ -44,6 +44,10 @@ func Register(name string, driver driver.Driver, services ...any) {
 	drivers[name] = driver
 }
 
+func Handle(h driver.Handler) {
+	h.ServeOCI(ctx)
+}
+
 func NewRuntime(driver string) (*Runtime, error) {
 	driversMu.RLock()
 	drv, ok := drivers[driver]
@@ -68,6 +72,18 @@ func Open(ctx context.Context, runtime driver.Driver, uri string) (driver.Conn, 
 }
 
 func Pull(ctx context.Context, p driver.Puller, ref string) (string, error) {
+	return p.Pull(ctx, ref)
+}
+
+func Pull(ctx context.Context, p driver.Puller, args ...any) error {
+	if len(args) != 1 {
+		return nil
+	}
+
+	ref, ok := args[0].(string)
+	if !ok {
+		return nil
+	}
 	return p.Pull(ctx, ref)
 }
 

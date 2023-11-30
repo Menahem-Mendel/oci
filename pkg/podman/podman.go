@@ -3,41 +3,40 @@ package adapter
 import (
 	"bufio"
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/http"
 	"oci"
 	"oci/driver"
-	"strconv"
+	"oci/pkg/podman/image"
 	"time"
 
-	"github.com/containers/image/v5/types"
-	"github.com/containers/podman/v4/pkg/auth"
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
-	"github.com/containers/podman/v4/pkg/bindings/images"
-
 	// "github.com/containers/podman/v4/pkg/bindings/network"
-	"github.com/containers/podman/v4/pkg/domain/entities"
-	"github.com/containers/podman/v4/pkg/errorhandling"
-
 	// "github.com/containers/podman/v4/pkg/specgen"
-	"github.com/opencontainers/go-digest"
 )
 
 func init() {
-	var is *imageService
-	var p *Podman
-	oci.Register("podman", p, is)
+	// var p *Podman
+	oci.Register("podman", nil, nil)
+
+	// var imageService *image.Service
+	var imgPullerService *image.Puller
+	// var containerService container.Service
+
+	oci.Handle(oci.Pull, imgPullerService)
+
+	// oci.HandlePuller(containerService)
 }
 
 type Podman struct {
 	conns map[string]driver.Conn
+}
 
-	imageService *imageService
+func (c *Conn) Exec(ctx context.Context, f func(context.Context, any, ...any), params ...any) {
+	f()
 }
 
 func (p *Podman) Open(ctx context.Context, uri string) (driver.Conn, error) {
@@ -53,11 +52,6 @@ func (p *Podman) Open(ctx context.Context, uri string) (driver.Conn, error) {
 	_ = conn
 
 	return nil, nil
-}
-
-func (p *Podman) Puller(service driver.Puller) {
-	var img *imageService
-	service = img
 }
 
 type UnixRoundTripper struct {
@@ -168,207 +162,14 @@ func (c *Conn) Begin(ctx context.Context) error {
 }
 
 func (c *Conn) Prepare(service string) (any, error) {
-	switch service {
-	case "images":
-		return &imageService{
-			conn: c.conn,
-		}, nil
-	}
-
 	return nil, nil
 }
 
-type imageService struct {
-	name string
-
-	conn *bindings.Connection
-}
-
-func (i *imageService) Init(p driver.Puller) {
-	p = i
-}
-
-func (i *imageService) Pull(ctx context.Context, ref string) (int, error) {
-	opts := images.PullOptions{}
-
-	if i.conn == nil {
-		return 0, fmt.Errorf("podman: %w", "ErrNoConnection")
-	}
-
-	params, err := opts.ToParams()
-	if err != nil {
-		return 0, err
-	}
-	params.Set("reference", ref)
-
-	// SkipTLSVerify is special.  It's not being serialized by ToParams()
-	// because we need to flip the boolean.
-	if opts.SkipTLSVerify != nil {
-		params.Set("tlsVerify", strconv.FormatBool(!opts.GetSkipTLSVerify()))
-	}
-
-	header, err := auth.MakeXRegistryAuthHeader(&types.SystemContext{AuthFilePath: opts.GetAuthfile()}, opts.GetUsername(), opts.GetPassword())
-	if err != nil {
-		return 0, err
-	}
-
-	response, err := i.conn.DoRequest(ctx, nil, http.MethodPost, "/images/pull", params, header)
-	if err != nil {
-		return 0, err
-	}
-	defer response.Body.Close()
-
-	if !response.IsSuccess() {
-		return 0, response.Process(err)
-	}
-
-	dec := json.NewDecoder(response.Body)
-	var pullErrors []error
-
-	var n int
-LOOP:
-	for {
-		var report entities.ImagePullReport
-		if err := dec.Decode(&report); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			report.Error = err.Error() + "\n"
-		}
-
-		select {
-		case <-response.Request.Context().Done():
-			break LOOP
-		default:
-			// non-blocking select
-		}
-
-		switch {
-		case report.Stream != "":
-			n = len(report.Stream)
-		case report.Error != "":
-			pullErrors = append(pullErrors, errors.New(report.Error))
-		case report.ID != "":
-		default:
-			return 0, fmt.Errorf("failed to parse pull results stream, unexpected input: %v", report)
-		}
-	}
-
-	return n, errorhandling.JoinErrors(pullErrors)
-}
-
-type image struct {
-	ref string
-	id  string
-}
-
-type Puller struct {
-}
-
-func (p *Puller) Pull(ctx context.Context, ref string) (string, error) {
-	return "", nil
-}
-
-func (i *image) NewPuller(pl driver.Puller) *Puller {
-	// if it's already a Puller, just return it
-	b, ok := pl.(*Puller)
-	if ok {
-		return b
-	}
-
-	p := new(Puller)
-	return p
-}
-
-type Status struct {
-	id     string
-	ref    string
-	size   int64
-	digest digest.Digest
-	os     string
-	arch   string
-}
-
-func (s Status) ID() string {
-	return s.id
-}
-
-func (s Status) Ref() string {
-	return s.ref
-}
-
-func (s Status) Size() int64 {
-	return s.size
-}
-
-func (s Status) Digest() digest.Digest {
-	return s.digest
-}
-
-func (s Status) OS() string {
-	return s.os
-}
-
-func (s Status) Arch() string {
-	return s.arch
-}
-
-type ContainerConf struct {
-	Architecture string
-}
-
-func (c ContainerConf) WithArch(conf driver.Configer) {
-	c.Architecture = conf
-}
-
-func (c ContainerConf) Set(opt driver.Option) {
-	opt.Apply(c)
+func f(p driver.Puller) {
 
 }
 
-type ImageConf struct {
-	ID            string
-	Architecture  string
-	Author        string
-	DockerVersion string
-	Name          string `json:",omitempty"`
-	Os            string
-	Tag           string `json:",omitempty"`
-	Variant       string
-	Env           []string
-	Layers        []string
-	RepoTags      []string
-	Created       *time.Time
-	Digest        digest.Digest
-	Labels        map[string]string
-	LayersData    []Layer
-}
-
-type ImageLayer struct {
-	Annotations map[string]string
-	Digest      digest.Digest
-	MIMEType    string // "" if unknown.
-	Size        int64  // -1 if unknown.
-}
-
-var withArch driver.WithArch = func(arch string) driver.Option {
-	return driver.OptionFunc(func(conf driver.Configer) error {
-		if i, ok := conf.(*ImageConf); ok {
-			i.Set(i.Architecture, arch)
-		}
-		return nil
-	})
-}
-
-func (i *ImageConf) Set(key string, val any) error {
-	key = val.(string)
-}
-
-func (i *ImageConf) WithArch(arch string) driver.Option {
-	return driver.OptionFunc(func(conf driver.Configer) error {
-		if i, ok := conf.(*ImageConf); ok {
-			i.Set(i.Architecture, arch)
-		}
-		return nil
-	})
+func g() {
+	var s *image.Service
+	f(s)
 }

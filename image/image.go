@@ -10,10 +10,25 @@ import (
 )
 
 type Service struct {
-	Puller driver.Puller
+	srv driver.Service
 }
 
-type service struct {
+func (s *Service) Pull(ctx context.Context, ref string) (string, error) {
+	//  s.service.ServeOCI(ctx, driver.Puller)
+	// driver.Puller(service, ref) (string, error)
+	return "", nil
+}
+
+func Pull(ctx context.Context, conn driver.Conn, ref string) (string, error) {
+	var p driver.Puller
+
+	// var service driver.Service
+	//
+	// oci.Pull(ctx, service.(driver.Puller), ref)
+
+	conn.ExecPull(ctx, oci.Pull, ref)
+
+	return "", nil
 }
 
 // func imageService(conn driver.Conn) (any, error) {
@@ -40,27 +55,3 @@ type service struct {
 
 // 	return oci.Pull(ctx, p, ref)
 // }
-
-func Pull(ctx context.Context, conn driver.Conn, ref string) (string, error) {
-	var p driver.Puller
-
-	conn.Prepare()
-
-	return oci.Pull(ctx, p, ref)
-}
-
-func pull(ctx context.Context, p driver.Puller, ref string) {
-
-}
-
-type image struct {
-	drv driver.Driver
-
-	conn driver.Conn
-}
-
-func (p *image) Pull(ctx context.Context, ref string) (id string, err error) {
-	p.conn.Driver()
-
-	return
-}
