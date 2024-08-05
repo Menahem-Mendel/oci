@@ -43,7 +43,7 @@ type Driver interface {
 	// wrong and possibly make informed decisions about error handling and recovery.
 	Open(ctx context.Context, uri string) (Conn, error)
 
-	Services() map[string]Service
+	// Services() map[string]Service
 }
 
 type Service interface {
@@ -121,7 +121,7 @@ type Conn interface {
 	//
 	// Note: The specific behavior and the kind of data that needs to be written or read
 	// depends on the implementation of the specific service.
-	Prepare(service string) (any, error)
+	// Prepare(service string) (any, error)
 }
 
 // type ImageParserFunc func(r io.Reader) (ImageInfo, error)

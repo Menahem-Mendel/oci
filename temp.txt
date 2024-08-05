@@ -1,0 +1,12 @@
+user -> image.Pull(conn, "ref")
+image -> `driver.Puller` := oci.Pull(conn.Driver(), image.Pull, "ref")
+oci -> `driver.Puller` := services[driver]
+
+podman -> oci.Handle(image.Pull, `driver.Puller`)
+oci -> services[image.Service{}] = `driver.Puller`
+
+interface Handler {
+    ServeOCI()
+}
+
+type HandlerFunc func(ctx context.Context) err

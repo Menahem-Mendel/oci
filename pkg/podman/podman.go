@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"oci"
 	"oci/driver"
-	"oci/pkg/podman/image"
 	"time"
 
 	"github.com/containers/podman/v4/pkg/bindings"
@@ -19,14 +18,11 @@ import (
 )
 
 func init() {
-	// var p *Podman
-	oci.Register("podman", nil, nil)
+	var p *Podman
+	oci.Register("podman", p, nil)
 
 	// var imageService *image.Service
-	var imgPullerService *image.Puller
 	// var containerService container.Service
-
-	oci.Handle(oci.Pull, imgPullerService)
 
 	// oci.HandlePuller(containerService)
 }
@@ -36,22 +32,21 @@ type Podman struct {
 }
 
 func (c *Conn) Exec(ctx context.Context, f func(context.Context, any, ...any), params ...any) {
-	f()
+	// f()
 }
 
 func (p *Podman) Open(ctx context.Context, uri string) (driver.Conn, error) {
-	ctx, err := bindings.NewConnection(context.Background(), uri)
-	if err != nil {
-		return nil, fmt.Errorf("Podman.Connect: %w", err)
-	}
+	// ctx, err := bindings.NewConnection(context.Background(), uri)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("Podman.Connect: %w", err)
+	// }
 
 	conn, err := bindings.GetClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("Podman.Connect: %w", err)
 	}
-	_ = conn
 
-	return nil, nil
+	return &Conn{conn: conn}, nil
 }
 
 type UnixRoundTripper struct {
@@ -170,6 +165,6 @@ func f(p driver.Puller) {
 }
 
 func g() {
-	var s *image.Service
-	f(s)
+	// var s *image.Service
+	// f(s)
 }

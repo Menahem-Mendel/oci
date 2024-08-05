@@ -19,6 +19,7 @@ package oci
 
 import (
 	"context"
+	"errors"
 	"oci/driver"
 	"sync"
 )
@@ -44,9 +45,9 @@ func Register(name string, driver driver.Driver, services ...any) {
 	drivers[name] = driver
 }
 
-func Handle(h driver.Handler) {
-	h.ServeOCI(ctx)
-}
+// func Handle(h driver.Handler) {
+// 	h.ServeOCI(ctx)
+// }
 
 func NewRuntime(driver string) (*Runtime, error) {
 	driversMu.RLock()
@@ -55,6 +56,7 @@ func NewRuntime(driver string) (*Runtime, error) {
 	if !ok {
 		return nil, ErrUnregisteredDriver
 	}
+	_ = drv
 
 	// _, cancel := context.WithCancel(ctx)
 	return &Runtime{
@@ -62,59 +64,74 @@ func NewRuntime(driver string) (*Runtime, error) {
 	}, nil
 }
 
-type Configer interface {
-	Set(key string, value any) error
-	Get(key string) (any, error)
-}
+// type daemonConn struct {
+// 	c Conn
+// }
+
+// func (d *daemonConn) Begin(ctx context.Context) error {
+// 	d.c.Begin(ctx)
+// }
+
+// type Configer interface {
+// 	Set(key string, value any) error
+// 	Get(key string) (any, error)
+// }
 
 func Open(ctx context.Context, runtime driver.Driver, uri string) (driver.Conn, error) {
+	if runtime == nil {
+		return nil, errors.New("oci: no driver is provided")
+	}
 	return runtime.Open(ctx, uri)
 }
 
-func Pull(ctx context.Context, p driver.Puller, ref string) (string, error) {
-	return p.Pull(ctx, ref)
-}
+// func Pull(ctx context.Context, p driver.Puller, ref string) (string, error) {
+// 	return p.Pull(ctx, ref)
+// }
 
-func Pull(ctx context.Context, p driver.Puller, args ...any) error {
-	if len(args) != 1 {
-		return nil
-	}
+// func Pull(ctx context.Context, p driver.Puller, args ...any) error {
+// 	if len(args) != 1 {
+// 		return nil
+// 	}
 
-	ref, ok := args[0].(string)
-	if !ok {
-		return nil
-	}
-	return p.Pull(ctx, ref)
-}
+// 	ref, ok := args[0].(string)
+// 	if !ok {
+// 		return nil
+// 	}
+// 	return p.Pull(ctx, ref)
+// }
 
-func Push(ctx context.Context, p driver.Pusher, ref, id string) error {
-	return p.Push(ctx, ref, id)
-}
+// func Puller(drv driver.Driver, h driver.Handler) driver.Puller {
 
-func Stat(ctx context.Context, conf Configer, s driver.Inspector, id string) error {
-	return s.Stat(ctx, conf, id)
-}
+// }
 
-func List(ctx context.Context, conf []Configer, l driver.Lister) error {
-	return l.List(ctx, conf)
-}
+// func Push(ctx context.Context, p driver.Pusher, ref, id string) error {
+// 	return p.Push(ctx, ref, id)
+// }
 
-func Create(ctx context.Context, c driver.Creator, id string, args ...string) (string, error) {
-	return c.Build(ctx)
-}
+// func Stat(ctx context.Context, conf Configer, s driver.Inspector, id string) error {
+// 	return s.Stat(ctx, conf, id)
+// }
 
-func Start(ctx context.Context, s driver.Starter, id string) error {
-	return s.Start(ctx, id)
-}
+// func List(ctx context.Context, conf []Configer, l driver.Lister) error {
+// 	return l.List(ctx, conf)
+// }
 
-func Stop(ctx context.Context, s driver.Stoper, id string) error {
-	return s.Stop(ctx, id)
-}
+// func Create(ctx context.Context, c driver.Creator, id string, args ...string) (string, error) {
+// 	return c.Build(ctx)
+// }
 
-func Pause(ctx context.Context, p driver.Pauser, id string) error {
-	return p.Pause(ctx, id)
-}
+// func Start(ctx context.Context, s driver.Starter, id string) error {
+// 	return s.Start(ctx, id)
+// }
 
-func Kill(ctx context.Context, k driver.Killer, id string) error {
-	return k.Kill(ctx, id)
-}
+// func Stop(ctx context.Context, s driver.Stoper, id string) error {
+// 	return s.Stop(ctx, id)
+// }
+
+// func Pause(ctx context.Context, p driver.Pauser, id string) error {
+// 	return p.Pause(ctx, id)
+// }
+
+// func Kill(ctx context.Context, k driver.Killer, id string) error {
+// 	return k.Kill(ctx, id)
+// }

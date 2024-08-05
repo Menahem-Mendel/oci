@@ -1,9 +1,8 @@
 module oci
 
-go 1.20
+go 1.22
 
 require (
-	github.com/containers/image/v5 v5.25.0
 	github.com/containers/podman/v4 v4.5.1
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/opencontainers/image-spec v1.1.0-rc2.0.20221005185240-3a7f492d3f1b
@@ -26,6 +25,7 @@ require (
 	github.com/containerd/stargz-snapshotter/estargz v0.14.3 // indirect
 	github.com/containers/buildah v1.30.0 // indirect
 	github.com/containers/common v0.52.0 // indirect
+	github.com/containers/image/v5 v5.25.0 // indirect
 	github.com/containers/libtrust v0.0.0-20230121012942-c1716e8a8d01 // indirect
 	github.com/containers/ocicrypt v1.1.7 // indirect
 	github.com/containers/psgo v1.8.0 // indirect
