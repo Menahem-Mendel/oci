@@ -7,7 +7,7 @@ import (
 
 type Chain struct {
 	driver driver.Driver
-	ref    string
+	dsn    string
 
 	imageID     string
 	networkID   string
@@ -17,11 +17,11 @@ type Chain struct {
 	pool []driver.Handler
 }
 
-func NewChain(conn driver.Conn, ref string) *Chain {
+func NewChain(conn driver.Conn, dsn string) *Chain {
 	return &Chain{
 		// conn: conn,
 		pool: make([]driver.Handler, 0),
-		ref:  ref,
+		dsn:  dsn,
 	}
 }
 

@@ -43,10 +43,33 @@ type Driver interface {
 	// wrong and possibly make informed decisions about error handling and recovery.
 	Open(ctx context.Context, uri string) (Conn, error)
 
-	// Services() map[string]Service
-}
+	// Prepare method in the Conn interface is used to prepare a service based on the
+	// provided service name. It returns an io.ReadWriteCloser that's bound to the connection.
+	// This returned object encapsulates the CRD operations that can be performed on the service.
+	//
+	// For Create (Write) operations:
+	// Writing to the io.Writer part of the returned io.ReadWriteCloser can be used for
+	// creating resources. For example, in an image service, writing would create an image
+	// from the provided data. In the context of a network service, writing might create
+	// a network based on provided configurations.
+	//
+	// For Read operations:
+	// The io.Reader part is used for retrieving (inspecting) resources. Reading would
+	// provide information about the resource (like an image or network) based on its id
+	// or reference.
+	//
+	// For Delete (Close) operations:
+	// The Close method is used for deleting resources. When a resource (like an image or
+	// a network) is no longer needed, calling Close() would delete or remove it.
+	//
+	// If the provided service name does not exist or if the operation fails, the method
+	// will return an error.
+	//
+	// Note: The specific behavior and the kind of data that needs to be written or read
+	// depends on the implementation of the specific service.
+	// Prepare(service string) (any, error)
 
-type Service interface {
+	// Services() map[string]Service
 }
 
 // Conn represents a connection to a container runtime management daemon.
@@ -97,31 +120,28 @@ type Conn interface {
 	// to indicate that the connection has already been initialized.
 	Begin(ctx context.Context) error
 
-	// Prepare method in the Conn interface is used to prepare a service based on the
-	// provided service name. It returns an io.ReadWriteCloser that's bound to the connection.
-	// This returned object encapsulates the CRD operations that can be performed on the service.
-	//
-	// For Create (Write) operations:
-	// Writing to the io.Writer part of the returned io.ReadWriteCloser can be used for
-	// creating resources. For example, in an image service, writing would create an image
-	// from the provided data. In the context of a network service, writing might create
-	// a network based on provided configurations.
-	//
-	// For Read operations:
-	// The io.Reader part is used for retrieving (inspecting) resources. Reading would
-	// provide information about the resource (like an image or network) based on its id
-	// or reference.
-	//
-	// For Delete (Close) operations:
-	// The Close method is used for deleting resources. When a resource (like an image or
-	// a network) is no longer needed, calling Close() would delete or remove it.
-	//
-	// If the provided service name does not exist or if the operation fails, the method
-	// will return an error.
-	//
-	// Note: The specific behavior and the kind of data that needs to be written or read
-	// depends on the implementation of the specific service.
-	// Prepare(service string) (any, error)
+	Context() context.Context
+}
+
+// Fetcher is an interface that defines a method for fetching data from source name into io.Writer.
+//
+// The Fetch method streams data from the specified source (dsn) and writes it
+// to the provided io.Writer. This design allows efficient handling of data,
+// avoiding the need to load everything into memory.
+//
+// Implementations of Fetcher can define how the data is retrieved (e.g., over HTTP,
+// from a file, or a database).
+//
+// Parameters:
+//   - w: The destination where the fetched data will be written. This could be
+//     a file, a buffer, or any implementation of io.Writer.
+//   - dsn: A string that identifies the data source (e.g., a URL, file path, etc.).
+//
+// Returns:
+//   - n: The number of bytes successfully written to the destination.
+//   - err: An error if the fetch operation fails, or nil if successful.
+type Fetcher interface {
+	Fetch(w io.Writer, dsn string) (n int, err error)
 }
 
 // type ImageParserFunc func(r io.Reader) (ImageInfo, error)
@@ -154,23 +174,22 @@ type Puller interface {
 	// implementation to respect the context's behavior and to regularly check its status during the
 	// pulling process.
 	//
-	// The second parameter, 'reference', is a string that points to the resource to be pulled. In
+	// The second parameter, 'dsn', is a string that points to the resource to be pulled. In
 	// a container environment, this is usually the tag or the identifier of the container image in
-	// a remote registry. However, based on the flexible design of this interface, the 'reference'
+	// a remote registry. However, based on the flexible design of this interface, the 'dsn'
 	// can also refer to other pullable resources, depending on the context where this interface is
 	// implemented.
 	//
-	// The Pull method returns an integer and an error. The integer 'n' represents the number of bytes
-	// that have been pulled during the process. This is particularly useful when pulling data from a
-	// stream, as it provides the consumer with insights into the amount of data transferred during
-	// the pull operation.
+	// The Pull method returns a string and an error. The string 'id' represents the identifier
+	// of the pulled resource. This could be a unique identifier assigned to the resource after
+	// it has been successfully pulled.
 	//
 	// The error returned by the Pull method indicates the success or failure of the pull operation.
 	// If the operation is successful, this value will be nil. If something goes wrong, this error
 	// should provide details about the failure, which can include IO errors (issues related to the
 	// data stream), context errors (the pull operation being cancelled or timing out), or domain-specific
 	// errors (e.g., the resource not being found in the remote registry).
-	Pull(ctx context.Context, ref string) (id string, err error)
+	Pull(ctx context.Context, dsn string) (id string, err error)
 }
 
 // Pusher is an interface that abstracts the operation of pushing an OCI resource, such as an image,
@@ -179,9 +198,9 @@ type Puller interface {
 // specific methods and mechanisms to push an OCI resource.
 type Pusher interface {
 	// Push is a method which initiates the process of pushing an OCI resource, identified by its
-	// local ID or image name, to a specified location, referenced by 'ref'. The 'id' is a string which uniquely
+	// local ID or image name, to a specified location, referenced by 'dsn'. The 'id' is a string which uniquely
 	// identifies the resource in the local storage of an OCI compliant runtime. This could be an image
-	// name or ID. The 'ref' is a reference to the destination where the image needs to be pushed.
+	// name or ID. The 'dsn' is a reference to the destination where the image needs to be pushed.
 	// This could be a URL of a container registry or any other destination supported by the specific runtime.
 	//
 	// The context parameter is a context.Context object, which is used to provide cancellation
@@ -201,7 +220,7 @@ type Pusher interface {
 	// such as network errors, access permission errors, invalid ID or reference string, etc.
 	// Based on the nature and specifics of the error, appropriate error handling and recovery
 	// strategies can be implemented.
-	Push(ctx context.Context, ref, id string) error
+	Push(ctx context.Context, dsn, id string) error
 }
 
 type Builder interface {
@@ -258,7 +277,7 @@ func (o ConfigerFunc) Apply(v any) error {
 	return o(v)
 }
 
-type HandlerFunc func(ctx context.Context) error
+type Func func(ctx context.Context) error
 
 func (h HandlerFunc) ServeOCI(ctx context.Context) error {
 	return h(ctx)
@@ -282,6 +301,14 @@ type Remover interface {
 
 type Inspector interface {
 	Stat(ctx context.Context, id string) (map[string]any, error)
+}
+
+// Transfer is an interface that abstracts the operation of transferring data between two container engines.
+// This could be used to transfer images, containers, or other resources between different container runtimes
+// like Docker, Podman, containerd, etc. The Transfer interface encapsulates these operations, allowing the
+// caller to transfer data without needing to know the specifics of the underlying runtime.
+type Transfer interface {
+	Transfer(ctx context.Context, dest, src Conn, id string) error
 }
 
 // Execer is an interface that abstracts the operation of executing commands within the context

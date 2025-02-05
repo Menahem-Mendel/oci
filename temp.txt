@@ -1,5 +1,5 @@
-user -> image.Pull(conn, "ref")
-image -> `driver.Puller` := oci.Pull(conn.Driver(), image.Pull, "ref")
+user -> image.Pull(conn, "dsn")
+image -> `driver.Puller` := oci.Pull(conn.Driver(), image.Pull, "dsn")
 oci -> `driver.Puller` := services[driver]
 
 podman -> oci.Handle(image.Pull, `driver.Puller`)

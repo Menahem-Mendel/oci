@@ -13,13 +13,17 @@ import (
 
 	"github.com/containers/podman/v4/pkg/bindings"
 	"github.com/containers/podman/v4/pkg/bindings/containers"
+	podimg "oci/pkg/adpter/image"
 	// "github.com/containers/podman/v4/pkg/bindings/network"
 	// "github.com/containers/podman/v4/pkg/specgen"
 )
 
 func init() {
-	var p *Podman
-	oci.Register("podman", p, nil)
+	var p *podmanDriver
+	oci.Register("podman", p,
+		image.NewService(),
+		podimg.NewService(),
+	)
 
 	// var imageService *image.Service
 	// var containerService container.Service
@@ -27,7 +31,7 @@ func init() {
 	// oci.HandlePuller(containerService)
 }
 
-type Podman struct {
+type podmanDriver struct {
 	conns map[string]driver.Conn
 }
 
@@ -35,18 +39,19 @@ func (c *Conn) Exec(ctx context.Context, f func(context.Context, any, ...any), p
 	// f()
 }
 
-func (p *Podman) Open(ctx context.Context, uri string) (driver.Conn, error) {
-	// ctx, err := bindings.NewConnection(context.Background(), uri)
+func (p *podmanDriver) Open(uri string) (driver.Conn, error) {
+	_, err := bindings.NewConnection(context.Background(), uri)
+	if err != nil {
+		return nil, fmt.Errorf("podman: can't connect to the socket %s: %w", uri, err)
+	}
+
+	// bindings.NewConnection()
+	// conn, err := bindings.GetClient(ctx)
 	// if err != nil {
 	// 	return nil, fmt.Errorf("Podman.Connect: %w", err)
 	// }
 
-	conn, err := bindings.GetClient(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("Podman.Connect: %w", err)
-	}
-
-	return &Conn{conn: conn}, nil
+	return &Conn{}, nil
 }
 
 type UnixRoundTripper struct {
@@ -74,7 +79,7 @@ func (rt *UnixRoundTripper) RoundTrip(req *http.Request) (*http.Response, error)
 }
 
 // Close closes all connections to the podman container manager.
-func (p *Podman) Close() error {
+func (p *podmanDriver) Close() error {
 	for _, conn := range p.conns {
 		if err := conn.Close(); err != nil {
 			return fmt.Errorf("Podman.Close: %w", err)

@@ -20,8 +20,10 @@ package oci
 import (
 	"context"
 	"errors"
+	"io"
 	"oci/driver"
 	"sync"
+	"time"
 )
 
 var (
@@ -56,11 +58,11 @@ func NewRuntime(driver string) (*Runtime, error) {
 	if !ok {
 		return nil, ErrUnregisteredDriver
 	}
-	_ = drv
 
 	// _, cancel := context.WithCancel(ctx)
 	return &Runtime{
 		// cancel: cancel,
+		driver: drv,
 	}, nil
 }
 
@@ -77,35 +79,57 @@ func NewRuntime(driver string) (*Runtime, error) {
 // 	Get(key string) (any, error)
 // }
 
-func Open(ctx context.Context, runtime driver.Driver, uri string) (driver.Conn, error) {
+type driverConn struct {
+	db        *Runtime
+	createdAt time.Time
+
+	sync.Mutex  // guards following
+	ci          driver.Conn
+	needReset   bool // The connection session should be reset before use if true.
+	closed      bool
+	finalClosed bool // ci.Close has been called
+	// openStmt    map[*driverStmt]bool
+
+	// guarded by db.mu
+	inUse      bool
+	rtmuClosed bool      // same as closed, but guarded by rt.mu, for removeClosedStmtLocked
+	returnedAt time.Time // Time the connection was created or returned.
+	onPut      []func()  // code (with db.mu held) run when conn is next returned
+}
+
+// Open a new connection to the
+func Open(runtime driver.Driver, uri string) (driver.Conn, error) {
 	if runtime == nil {
 		return nil, errors.New("oci: no driver is provided")
 	}
-	return runtime.Open(ctx, uri)
+
+	return runtime.Open(uri)
 }
 
-// func Pull(ctx context.Context, p driver.Puller, ref string) (string, error) {
-// 	return p.Pull(ctx, ref)
-// }
+func Pull(ctx context.Context, p driver.Puller, dsn string) (string, error) {
+	p.Pull(ctx, dsn)
+
+	return p.Pull(ctx, dsn)
+}
 
 // func Pull(ctx context.Context, p driver.Puller, args ...any) error {
 // 	if len(args) != 1 {
 // 		return nil
 // 	}
 
-// 	ref, ok := args[0].(string)
+// 	dsn, ok := args[0].(string)
 // 	if !ok {
 // 		return nil
 // 	}
-// 	return p.Pull(ctx, ref)
+// 	return p.Pull(ctx, dsn)
 // }
 
 // func Puller(drv driver.Driver, h driver.Handler) driver.Puller {
 
 // }
 
-// func Push(ctx context.Context, p driver.Pusher, ref, id string) error {
-// 	return p.Push(ctx, ref, id)
+// func Push(ctx context.Context, p driver.Pusher, dsn, id string) error {
+// 	return p.Push(ctx, dsn, id)
 // }
 
 // func Stat(ctx context.Context, conf Configer, s driver.Inspector, id string) error {

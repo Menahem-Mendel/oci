@@ -2,6 +2,7 @@ package oci
 
 import (
 	"context"
+	"errors"
 	"oci/driver"
 	"sync"
 )
@@ -16,6 +17,13 @@ type Runtime struct {
 	mu sync.RWMutex
 }
 
+type runtime struct {
+}
+
+func (r runtime) Serve(p driver.Puller) {
+
+}
+
 func New(driver driver.Driver) (*Runtime, error) {
 	// _, cancel := context.WithCancel(ctx)
 	return &Runtime{
@@ -23,8 +31,11 @@ func New(driver driver.Driver) (*Runtime, error) {
 	}, nil
 }
 
-func (r *Runtime) Open(ctx context.Context, uri string) (driver.Conn, error) {
-	return r.driver.Open(ctx, uri)
+func (r *Runtime) Open(uri string) (driver.Conn, error) {
+	if r.driver == nil {
+		return nil, errors.New("oci: runtime have nil driver")
+	}
+	return r.driver.Open(uri)
 }
 
 func (r *Runtime) Serve(ctx context.Context, h driver.Handler) error {

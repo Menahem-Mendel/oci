@@ -8,31 +8,64 @@ import (
 	"oci/driver"
 )
 
-// func Pull(ctx context.Context, conn driver.Conn, ref string) (string, error) {
-// 	// oci.Pull(ctx, conn, ref)
-// }
-
 type Service struct {
+	Conn driver.Conn
 }
 
-func (s *Service) ServeOCI() {
-
+func NewService(conn driver.Conn) *Service {
+	return &Service{Conn: conn}
 }
 
-// func (s *Service) Pull(ctx context.Context, ref string) (string, error) {
-
-// }
-
-type image struct {
+func (s *Service) ServeOCI(ctx context.Context) error {
+	return nil
 }
 
-func (p *image) Pull(ctx context.Context, ref string) (string, error) {
+func (p *Service) Pull(ctx context.Context, dsn string) (string, error) {
 	return "", nil
 }
 
-func NewPuller(drv driver.Driver) *image {
-	return &image{}
+func (p *Service) Push(ctx context.Context, dsn, id string) error {
+	return nil
 }
 
-type Puller struct {
+func (p *Service) Stat(ctx context.Context, id string) (map[string]any, error) {
+	return nil, nil
+}
+
+func (p *Service) Remove(ctx context.Context, id string) error {
+	return nil
+}
+
+type pullOption struct {
+}
+
+type puller struct {
+}
+
+func (p *puller) Options(drv driver.Driver) []pullOption {
+	// var opt driver.Option
+
+	return nil
+}
+
+// oci/image, oci, oci/driver, pkg/podman, pkg/docker,
+// pkg/podman <- oci, oci/image
+// oci.driver <-
+// oci/image <- oci.driver
+type PodmanDriver struct {
+	conns []oci.Conn
+}
+type conn struct {
+}
+
+type Runtime struct {
+
+}
+
+rt = oci.NewRuntime("podman")
+conn = rt.Open("socket.sock")
+
+
+type Image struct {
+
 }
