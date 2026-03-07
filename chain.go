@@ -1,100 +1,29 @@
 package oci
 
-import (
-	"context"
-	"oci/driver"
-)
+import "context"
 
+// Chain is a lightweight workflow helper for sequencing runtime operations.
 type Chain struct {
-	driver driver.Driver
-	dsn    string
-
-	imageID     string
-	networkID   string
-	namespaceID string
-	containerID string
-
-	pool []driver.Handler
+	ops []func(context.Context) error
 }
 
-func NewChain(conn driver.Conn, dsn string) *Chain {
-	return &Chain{
-		// conn: conn,
-		pool: make([]driver.Handler, 0),
-		dsn:  dsn,
+func NewChain() *Chain {
+	return &Chain{ops: make([]func(context.Context) error, 0)}
+}
+
+func (c *Chain) Then(op func(context.Context) error) *Chain {
+	if op == nil {
+		return c
 	}
-}
-
-func (c Chain) ImageID() string {
-	return c.imageID
-}
-
-func (c Chain) NetworkID() string {
-	return c.networkID
-}
-
-func (c Chain) NamespaceID() string {
-	return c.namespaceID
-}
-
-func (c Chain) ContainerID() string {
-	return c.containerID
-}
-
-func (c *Chain) PullImage(opts ...driver.Option) *Chain {
-	handler := func(ctx context.Context) error { return nil }
-
-	c.pool = append(c.pool, driver.HandlerFunc(handler))
-
-	return c
-}
-
-func (c *Chain) StartContainer(opts ...driver.Option) *Chain {
-	handler := func(ctx context.Context) error { return nil }
-
-	c.pool = append(c.pool, driver.HandlerFunc(handler))
-
-	return c
-}
-
-func (c *Chain) NewNetwork(opts ...driver.Option) *Chain {
-	handler := func(ctx context.Context) error { return nil }
-
-	c.pool = append(c.pool, driver.HandlerFunc(handler))
-
-	return c
-}
-
-func (c *Chain) NewContainer(opts ...driver.Option) *Chain {
-	handler := func(ctx context.Context) error { return nil }
-
-	c.pool = append(c.pool, driver.HandlerFunc(handler))
-
-	return c
-}
-
-func (c *Chain) NewNamespace(opts ...driver.Option) *Chain {
-	handler := func(ctx context.Context) error { return nil }
-
-	c.pool = append(c.pool, driver.HandlerFunc(handler))
-
-	return c
-}
-
-func (c *Chain) Exec(cmd string, args ...string) *Chain {
-	handler := func(ctx context.Context) error { return nil }
-
-	c.pool = append(c.pool, driver.HandlerFunc(handler))
-
+	c.ops = append(c.ops, op)
 	return c
 }
 
 func (c *Chain) Commit(ctx context.Context) error {
-	for _, handler := range c.pool {
-		if err := handler.ServeOCI(ctx); err != nil {
+	for _, op := range c.ops {
+		if err := op(ctx); err != nil {
 			return err
 		}
 	}
-
 	return nil
 }

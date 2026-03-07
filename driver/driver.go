@@ -1,348 +1,80 @@
-// Copyright 2023, Menahem-Mendel Gelfand. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
-
-// This file contains the definitions for the Driver interface and related types in the oci package.
-// A Driver is the core interface in this package and is designed to enable interaction with different OCI implementations.
+// Package driver defines the low-level contracts implemented by runtime
+// adapters (Podman, containerd, Docker, etc.).
 package driver
 
 import (
 	"context"
-	"io"
+	"errors"
 )
 
-// Driver is an interface that defines the behavior of components that
-// establish connections with container runtime management daemons. The
-// implementations of this interface allow the application to interact with
-// different container managers (such as Docker, Podman, etc.), abstracting
-// the details of the connection process and providing a unified way of
-// managing these connections across different runtimes.
+var ErrNotSupported = errors.New("oci/driver: operation not supported")
+
+const (
+	KindImage     = "image"
+	KindContainer = "container"
+	KindNetwork   = "network"
+	KindVolume    = "volume"
+)
+
+// Driver opens a connection to a runtime endpoint.
+// The dsn format is driver-specific.
 type Driver interface {
-	// Open method is responsible for establishing a new connection to a
-	// container manager daemon, using the provided context and uri parameters.
-	//
-	// The context parameter is a context.Context object that can be used
-	// to cancel the connection process. This is useful for controlling the
-	// lifecycle of the connection, especially in situations where the connection
-	// process could potentially block for an indefinite period of time, or
-	// in scenarios where control over cancellation, timeout, and deadline
-	// behavior is required.
-	//
-	// The uri parameter specifies the location of the container manager daemon.
-	// The format and interpretation of this uri is driver-specific, meaning
-	// different Driver implementations may expect different uri formats
-	// according to the requirements of the container manager they interact with.
-	//
-	// The Open method returns a Conn object on success, representing the
-	// established connection to the container manager daemon. This Conn object
-	// can then be used for further interactions with the container manager daemon.
-	//
-	// In case the connection process fails, the Open method should return a
-	// non-nil error that provides details about the reason of the failure. The
-	// error should be descriptive enough to allow callers to understand what went
-	// wrong and possibly make informed decisions about error handling and recovery.
-	Open(ctx context.Context, uri string) (Conn, error)
-
-	// Prepare method in the Conn interface is used to prepare a service based on the
-	// provided service name. It returns an io.ReadWriteCloser that's bound to the connection.
-	// This returned object encapsulates the CRD operations that can be performed on the service.
-	//
-	// For Create (Write) operations:
-	// Writing to the io.Writer part of the returned io.ReadWriteCloser can be used for
-	// creating resources. For example, in an image service, writing would create an image
-	// from the provided data. In the context of a network service, writing might create
-	// a network based on provided configurations.
-	//
-	// For Read operations:
-	// The io.Reader part is used for retrieving (inspecting) resources. Reading would
-	// provide information about the resource (like an image or network) based on its id
-	// or reference.
-	//
-	// For Delete (Close) operations:
-	// The Close method is used for deleting resources. When a resource (like an image or
-	// a network) is no longer needed, calling Close() would delete or remove it.
-	//
-	// If the provided service name does not exist or if the operation fails, the method
-	// will return an error.
-	//
-	// Note: The specific behavior and the kind of data that needs to be written or read
-	// depends on the implementation of the specific service.
-	// Prepare(service string) (any, error)
-
-	// Services() map[string]Service
+	Open(dsn string) (Conn, error)
 }
 
-// Conn represents a connection to a container runtime management daemon.
-// This interface abstracts the connection details, allowing the library
-// to interact with different container managers in a unified manner,
-// regardless of the specific protocols or mechanisms used by each manager
-// to maintain and manage connections.
-//
-// Implementations of the Conn interface are expected to provide specific
-// Close and Begin methods that manage the lifecycle of the connection
-// (such as initializing, terminating, and cleaning up the connection).
-// This is particularly important to prevent resource leaks in long-running
-// programs or in scenarios where a large number of connections might be
-// created over time.
+// Conn is the minimal connection contract shared by all runtime adapters.
 type Conn interface {
-	// Close method should return an error if the closing operation fails,
-	// allowing the caller to understand the reason for the failure and potentially
-	// take steps to handle or recover from the error condition. The returned
-	// error should be descriptive enough to provide meaningful information about
-	// the failure.
-	//
-	// Although not explicitly required by the Conn interface itself, implementations
-	// are strongly encouraged to make the Close method idempotent, meaning that
-	// multiple calls to Close on the same connection object should be safe and
-	// should not result in undefined behavior. Typically, the first call to
-	// Close should perform the actual closing operation, and any subsequent
-	// calls should have no effect but should return a specific error (or nil)
-	// to indicate that the connection has already been closed.
 	Close() error
-
-	// Begin method is responsible for initializing the connection to the
-	// container manager daemon and preparing it for further interactions.
-	// This method should be called before any other operations are performed
-	// on the connection after it has been closed.
-	//
-	// The Begin method returns an error if the initialization process fails.
-	// This error should be descriptive enough to provide meaningful information
-	// about the reason for the failure, allowing the caller to understand what
-	// went wrong and potentially take steps to handle or recover from the error
-	// condition.
-	//
-	// Although not explicitly required by the Conn interface itself, implementations
-	// are strongly encouraged to make the Begin method idempotent, meaning that
-	// multiple calls to Begin on the same connection object should be safe and
-	// should not result in undefined behavior. Typically, the first call to
-	// Begin should perform the actual initialization operation, and any subsequent
-	// calls should have no effect but should return a specific error (or nil)
-	// to indicate that the connection has already been initialized.
-	Begin(ctx context.Context) error
-
-	Context() context.Context
 }
 
-// Fetcher is an interface that defines a method for fetching data from source name into io.Writer.
-//
-// The Fetch method streams data from the specified source (dsn) and writes it
-// to the provided io.Writer. This design allows efficient handling of data,
-// avoiding the need to load everything into memory.
-//
-// Implementations of Fetcher can define how the data is retrieved (e.g., over HTTP,
-// from a file, or a database).
-//
-// Parameters:
-//   - w: The destination where the fetched data will be written. This could be
-//     a file, a buffer, or any implementation of io.Writer.
-//   - dsn: A string that identifies the data source (e.g., a URL, file path, etc.).
-//
-// Returns:
-//   - n: The number of bytes successfully written to the destination.
-//   - err: An error if the fetch operation fails, or nil if successful.
-type Fetcher interface {
-	Fetch(w io.Writer, dsn string) (n int, err error)
+// Optional capability interfaces.
+
+type Pinger interface {
+	Ping(ctx context.Context) error
 }
 
-// type ImageParserFunc func(r io.Reader) (ImageInfo, error)
-
-// type ParserFunc func(r io.Reader) (Info, error)
-
-// func (p ParserFunc) Parse(r io.Reader) (Info, error) {
-// 	return p(r)
-// }
-
-// type Parser interface {
-// 	Parse(r io.Reader) (Info, error)
-// }
-
-// Puller interface represents a key abstraction in the realm of container-based and cloud-native
-// applications. The term 'pull' is conventionally used to denote the retrieval of an object or resource
-// from a remote location. Specifically, within the context of container technology, 'pull' refers to
-// the process of fetching a container image from a registry. However, the Puller interface is
-// intentionally designed without an explicit prefix (like 'Container' or 'Image'), allowing it to
-// be used in diverse contexts where the pull operation is applicable.
+// Puller pulls a resource reference (typically an image) and returns its local ID.
 type Puller interface {
-	// Pull is a method within the Puller interface that encapsulates the logic for fetching or
-	// 'pulling' a resource, represented by a string reference, in a given context.
-	//
-	// The first parameter, 'ctx', is a context.Context object. This carries deadlines, cancellation
-	// signals, and other request-specific values across API boundaries and between processes. It is
-	// used to manage the lifecycle of the pull operation. For example, if the pulling process is
-	// long-running, the context can be used to stop the operation gracefully if it's taking too long
-	// or if the client decides to cancel the operation. It's the responsibility of the Pull method's
-	// implementation to respect the context's behavior and to regularly check its status during the
-	// pulling process.
-	//
-	// The second parameter, 'dsn', is a string that points to the resource to be pulled. In
-	// a container environment, this is usually the tag or the identifier of the container image in
-	// a remote registry. However, based on the flexible design of this interface, the 'dsn'
-	// can also refer to other pullable resources, depending on the context where this interface is
-	// implemented.
-	//
-	// The Pull method returns a string and an error. The string 'id' represents the identifier
-	// of the pulled resource. This could be a unique identifier assigned to the resource after
-	// it has been successfully pulled.
-	//
-	// The error returned by the Pull method indicates the success or failure of the pull operation.
-	// If the operation is successful, this value will be nil. If something goes wrong, this error
-	// should provide details about the failure, which can include IO errors (issues related to the
-	// data stream), context errors (the pull operation being cancelled or timing out), or domain-specific
-	// errors (e.g., the resource not being found in the remote registry).
-	Pull(ctx context.Context, dsn string) (id string, err error)
+	Pull(ctx context.Context, reference string, options map[string]string) (string, error)
 }
 
-// Pusher is an interface that abstracts the operation of pushing an OCI resource, such as an image,
-// to a storage location, often a container registry. Different implementations of this interface
-// may work with different OCI compliant runtimes like Docker, Podman, etc., each having their own
-// specific methods and mechanisms to push an OCI resource.
+// Pusher pushes a resource reference and returns a runtime-specific result string.
 type Pusher interface {
-	// Push is a method which initiates the process of pushing an OCI resource, identified by its
-	// local ID or image name, to a specified location, referenced by 'dsn'. The 'id' is a string which uniquely
-	// identifies the resource in the local storage of an OCI compliant runtime. This could be an image
-	// name or ID. The 'dsn' is a reference to the destination where the image needs to be pushed.
-	// This could be a URL of a container registry or any other destination supported by the specific runtime.
-	//
-	// The context parameter is a context.Context object, which is used to provide cancellation
-	// and timeout signals. This ensures that the push operation can be controlled and monitored
-	// effectively, allowing for graceful termination in case of an unexpected long runtime,
-	// system shutdown, or similar scenarios where the operation cannot be allowed to run indefinitely.
-	//
-	// The Push method returns an integer indicating the number of bytes transferred during
-	// the push operation. This might be useful for tracking the amount of data transferred,
-	// especially in applications where monitoring or logging of data transfer is required.
-	// However, depending on the specific implementation and nature of the operation, this value
-	// might not always be accurate or meaningful. Therefore, use of this returned value should
-	// be done with understanding of these potential limitations.
-	//
-	// In case of failure during the push operation, the Push method returns a non-nil error.
-	// This error helps the caller to understand what went wrong during the push operation,
-	// such as network errors, access permission errors, invalid ID or reference string, etc.
-	// Based on the nature and specifics of the error, appropriate error handling and recovery
-	// strategies can be implemented.
-	Push(ctx context.Context, dsn, id string) error
+	Push(ctx context.Context, reference string, options map[string]string) (string, error)
 }
 
-type Builder interface {
-	Build(ctx context.Context) (id string, err error)
-}
-
-type Starter interface {
-	Start(ctx context.Context, id string) error
-}
-
-// INFO: maybe should just use Closer interface
-
-type Pauser interface {
-	Pause(ctx context.Context, id string) error
-}
-
-type Stoper interface {
-	Stop(ctx context.Context, id string) error
-}
-
-type Killer interface {
-	Kill(ctx context.Context, id string) error
-}
-
-// INFO
-
-type Mounter interface {
-	Mount(ctx context.Context, id string, target string) error
-}
-
-type ArchOption Option
-
-type WithArch func(arch string) Option
-
-type WithCDIDevice func(name string) Option
-
-type Option interface {
-	Apply(conf Configer) error
-}
-
-type OptionFunc func(v Configer) error
-
-func (o OptionFunc) Apply(v Configer) error {
-	return o(v)
-}
-
-type Configer interface {
-	Set(key string, val any) error
-}
-
-type ConfigerFunc func(v any) error
-
-func (o ConfigerFunc) Apply(v any) error {
-	return o(v)
-}
-
-type Func func(ctx context.Context) error
-
-func (h HandlerFunc) ServeOCI(ctx context.Context) error {
-	return h(ctx)
-}
-
-type Handler interface {
-	ServeOCI(ctx context.Context) error
-}
-
-type Limiter interface {
-	Limit(limit int) error
-}
-
-type Lister interface {
-	List(ctx context.Context, v []any) error
-}
-
-type Remover interface {
-	Remove(ctx context.Context, id string) error
-}
-
+// Inspector returns a dynamic resource document.
 type Inspector interface {
-	Stat(ctx context.Context, id string) (map[string]any, error)
+	Inspect(ctx context.Context, kind string, idOrRef string) (map[string]any, error)
 }
 
-// Transfer is an interface that abstracts the operation of transferring data between two container engines.
-// This could be used to transfer images, containers, or other resources between different container runtimes
-// like Docker, Podman, containerd, etc. The Transfer interface encapsulates these operations, allowing the
-// caller to transfer data without needing to know the specifics of the underlying runtime.
-type Transfer interface {
-	Transfer(ctx context.Context, dest, src Conn, id string) error
+// Lister returns dynamic resource documents.
+type Lister interface {
+	List(ctx context.Context, kind string, filters map[string]string) ([]map[string]any, error)
 }
 
-// Execer is an interface that abstracts the operation of executing commands within the context
-// of a container runtime. This could be used with various container runtimes like Docker,
-// Podman, containerd, etc., each having their unique methods for executing commands inside running
-// containers. The Execer interface encapsulates these operations, allowing the caller to execute a
-// command without needing to know the specifics of the underlying runtime.
+// Remover removes a resource.
+type Remover interface {
+	Remove(ctx context.Context, kind string, idOrRef string, force bool) error
+}
+
+// Creator creates a resource and returns its ID.
+type Creator interface {
+	Create(ctx context.Context, kind string, spec map[string]any) (string, error)
+}
+
+// Starter starts a resource.
+type Starter interface {
+	Start(ctx context.Context, kind string, id string) error
+}
+
+// Stopper stops a resource.
+type Stopper interface {
+	Stop(ctx context.Context, kind string, id string, timeoutSeconds int) error
+}
+
+// Execer executes a command in a container-like resource.
+// Returned map is expected to include keys like "exit_code", "stdout", "stderr".
 type Execer interface {
-	// Exec is a method that initiates the operation of executing a specific command, identified by
-	// the 'cmd' parameter and a variable number of arguments 'args', within a running container
-	// or any other suitable runtime environment.
-	//
-	// The 'ctx' parameter is a context.Context object, which is used to provide control over the
-	// lifetime of the operation. With this context, it's possible to cancel the executing operation
-	// or set a timeout, thus preventing runaway processes that could consume resources indefinitely.
-	// This is particularly important in scenarios where resources are limited, and long-running
-	// operations might have a significant impact on system performance.
-	//
-	// The Exec method returns an error in case the command execution fails. This error provides
-	// insight into what went wrong during the operation, such as issues with the command itself,
-	// problems with the target container, network errors, access permission errors, etc. This
-	// returned error allows the caller to implement appropriate error handling and recovery
-	// strategies, depending on the specifics of the error.
-	Exec(ctx context.Context, cmd string, args ...string) error
-}
-
-type StdinWriter interface {
-	StdinPipe(ctx context.Context) (io.WriteCloser, error)
-}
-
-type StdoutReader interface {
-	StdoutPipe(ctx context.Context) (io.ReadCloser, error)
-}
-
-type StderrReader interface {
-	StderrPipe(ctx context.Context) (io.ReadCloser, error)
+	Exec(ctx context.Context, id string, command []string, options map[string]any) (map[string]any, error)
 }

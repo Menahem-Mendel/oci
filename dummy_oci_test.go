@@ -2,218 +2,129 @@ package oci_test
 
 import (
 	"context"
-	"fmt"
-	"net/url"
 	"oci"
 	"oci/driver"
-	"oci/image"
-	"sync"
+	"strconv"
 	"testing"
 	"time"
 )
 
-func init() {
-	oci.Register("fake", &fakeDriver{})
-
-	rt, err := oci.NewRuntime("fake")
-	if err != nil {
-	}
-	_, _ = rt, err
-
-}
-
 type fakeDriver struct {
-	mu         sync.Mutex
-	openCount  int
-	closeCount int
-
-	imgSrv fakeIMGServer
-	// ctrSrv   fakeCTRServer
-	// netSrv   fakeNETServer
-	// nmspcSrv fakeNMSPCServer
+	conn driver.Conn
+	dsn  string
 }
 
-func (fd *fakeDriver) Open(uri string) (driver.Conn, error) {
-	u, err := url.ParseRequestURI(uri)
+func (d *fakeDriver) Open(dsn string) (driver.Conn, error) {
+	d.dsn = dsn
+	return d.conn, nil
+}
+
+type fakeConn struct {
+	started string
+	stopped string
+	closed  bool
+}
+
+func (c *fakeConn) Close() error {
+	c.closed = true
+	return nil
+}
+
+func (c *fakeConn) Ping(ctx context.Context) error {
+	return nil
+}
+
+func (c *fakeConn) Pull(ctx context.Context, reference string, options map[string]string) (string, error) {
+	return "img-1", nil
+}
+
+func (c *fakeConn) Create(ctx context.Context, kind string, spec map[string]any) (string, error) {
+	if kind != driver.KindContainer {
+		return "", driver.ErrNotSupported
+	}
+	return "ctr-1", nil
+}
+
+func (c *fakeConn) Start(ctx context.Context, kind string, id string) error {
+	c.started = kind + ":" + id
+	return nil
+}
+
+func (c *fakeConn) Stop(ctx context.Context, kind string, id string, timeoutSeconds int) error {
+	c.stopped = kind + ":" + id + ":" + strconv.Itoa(timeoutSeconds)
+	return nil
+}
+
+func uniqueDriverName(t *testing.T) string {
+	t.Helper()
+	return "fake-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+}
+
+func TestOpenAndBasicFlow(t *testing.T) {
+	conn := &fakeConn{}
+	drv := &fakeDriver{conn: conn}
+	name := uniqueDriverName(t)
+	oci.Register(name, drv)
+
+	rt, err := oci.Open(name, "unix:///tmp/fake.sock")
 	if err != nil {
-		return nil, fmt.Errorf("invalid URI: %w", err)
+		t.Fatalf("open runtime: %v", err)
+	}
+	defer rt.Close()
+
+	if err := rt.Ping(context.Background()); err != nil {
+		t.Fatalf("ping: %v", err)
 	}
 
-	if !isValidScheme(u.Scheme) {
-		return nil, fmt.Errorf("invalid scheme: %s", u.Scheme)
+	imageID, err := rt.PullImage(context.Background(), "docker.io/library/alpine:latest", nil)
+	if err != nil {
+		t.Fatalf("pull image: %v", err)
 	}
-	return &fakeConn{}, nil
-}
-
-type fakeIMGServer struct{}
-
-func (fis *fakeIMGServer) Pull(ctx context.Context, dsn string) (string, error) {
-	return "", nil
-}
-
-func (fis *fakeIMGServer) Push(ctx context.Context, dsn, id string) error {
-	return nil
-}
-
-func (fis *fakeIMGServer) Stat(ctx context.Context, id string) (map[string]any, error) {
-	return nil, nil
-}
-
-// type fakeCTRServer struct{}
-
-// func (fcs fakeCTRServer)
-
-type fakeConn struct{}
-
-func (fc *fakeConn) Close() error {
-	return nil
-}
-
-func (fc *fakeConn) Begin(ctx context.Context) error {
-	return nil
-}
-
-type imageService struct{}
-
-type fakeImage struct{}
-
-type fakeContainer struct{}
-
-func (i *imageService) Pull(ctx context.Context, dsn string) (string, error) {
-	return "", nil
-}
-
-func isValidScheme(scheme string) bool {
-	validSchemes := map[string]struct{}{
-		"unix": {},
-		"tcp":  {},
-		"ssh":  {},
+	if imageID == "" {
+		t.Fatalf("expected image id")
 	}
 
-	_, valid := validSchemes[scheme]
-	return valid
-}
-
-func TestOpen(t *testing.T) {
-	tests := []struct {
-		name    string
-		uri     string
-		wantErr bool
-	}{
-		{
-			name:    "podman unix socket connection",
-			uri:     "unix:///run/user/1000/podman/podman.sock",
-			wantErr: false,
-		},
-		{
-			name:    "podman tcp socket connection",
-			uri:     "tcp://localhost:2375",
-			wantErr: false,
-		},
-		{
-			name:    "podman invalid uri",
-			uri:     "invalid://localhost",
-			wantErr: true,
-		},
+	ctrID, err := rt.CreateContainer(context.Background(), map[string]any{
+		oci.SpecName:  "demo",
+		oci.SpecImage: imageID,
+	})
+	if err != nil {
+		t.Fatalf("create container: %v", err)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
+	if err := rt.StartContainer(context.Background(), ctrID); err != nil {
+		t.Fatalf("start container: %v", err)
+	}
+	if err := rt.StopContainer(context.Background(), ctrID, 2*time.Second); err != nil {
+		t.Fatalf("stop container: %v", err)
+	}
 
-			fd := &fakeDriver{}
-			conn, err := oci.Open(ctx, fd, tt.uri)
-
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("expected error = %v, got %v", tt.wantErr, err)
-			}
-
-			if err == nil && conn == nil {
-				t.Fatalf("no connection is established")
-			}
-
-			if conn != nil {
-				if err := conn.Close(); err != nil {
-					t.Errorf("failed to close connection: %v", err)
-				}
-			}
-		})
+	if conn.started != driver.KindContainer+":ctr-1" {
+		t.Fatalf("unexpected started marker: %s", conn.started)
+	}
+	if conn.stopped != driver.KindContainer+":ctr-1:2" {
+		t.Fatalf("unexpected stopped marker: %s", conn.stopped)
 	}
 }
 
-func TestPull(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+type pullOnlyConn struct{}
 
-	conn, err := oci.Open(ctx, fd, tt.dsn)
+func (c *pullOnlyConn) Close() error { return nil }
+func (c *pullOnlyConn) Pull(ctx context.Context, reference string, options map[string]string) (string, error) {
+	return "img", nil
+}
 
-	puller := image.NewPuller(conn)
+func TestUnsupportedOperation(t *testing.T) {
+	name := uniqueDriverName(t)
+	oci.Register(name, &fakeDriver{conn: &pullOnlyConn{}})
 
-	tests := []struct {
-		name    string
-		dsn     string
-		puller  driver.Puller
-		wantErr bool
-	}{
-		{
-			name:    "nginx latest",
-			dsn:     "docker.io/library/nginx:latest",
-			puller:  puller,
-			wantErr: false,
-		},
-		{
-			name:    "nginx latest with no scheme",
-			dsn:     "nginx:latest",
-			puller:  puller,
-			wantErr: false,
-		},
-		{
-			name:    "debian default tag",
-			dsn:     "debian",
-			puller:  puller,
-			wantErr: false,
-		},
-		{
-			name:    "debian bookworm",
-			dsn:     "debian:bookworm",
-			puller:  puller,
-			wantErr: false,
-		},
-		{
-			name:    "ubuntu digest",
-			dsn:     "ubuntu@sha256:26c68657ccce2cb0a31b330cb0be2b5e108d467f641c62e13ab40cbec258c68d",
-			puller:  puller,
-			wantErr: false,
-		},
-		{
-			name:    "pull from custom registry",
-			dsn:     "myregistry.local:5000/testing/test-image",
-			puller:  puller,
-			wantErr: false,
-		},
+	rt, err := oci.Open(name, "unix:///tmp/fake.sock")
+	if err != nil {
+		t.Fatalf("open runtime: %v", err)
 	}
+	defer rt.Close()
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-
-			id, err := oci.Pull(ctx, fDriver.imgSrv, tt.dsn)
-
-			if (err != nil) != tt.wantErr {
-				t.Fatalf("expected error = %v, got %v", tt.wantErr, err)
-			}
-
-			if err == nil && conn == nil {
-				t.Fatalf("no connection is established")
-			}
-
-			if conn != nil {
-				if err := conn.Close(); err != nil {
-					t.Errorf("failed to close connection: %v", err)
-				}
-			}
-		})
+	if err := rt.Ping(context.Background()); err == nil {
+		t.Fatalf("expected unsupported ping error")
 	}
 }

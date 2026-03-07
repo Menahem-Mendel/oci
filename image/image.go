@@ -1,71 +1,73 @@
-// Copyright 2023, Menahem-Mendel Gelfand. All rights reserved.
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file.
 package image
 
 import (
-	"context"
-	"oci/driver"
+	"fmt"
+	"strings"
 )
 
-type Service struct {
-	Conn driver.Conn
+// Reference represents an OCI image reference in a normalized split form.
+type Reference struct {
+	Registry   string
+	Repository string
+	Tag        string
+	Digest     Digest
 }
 
-func NewService(conn driver.Conn) *Service {
-	return &Service{Conn: conn}
+// ParseReference performs light-weight parsing for common image references.
+// It does not validate every edge case in distribution/reference grammar.
+func ParseReference(ref string) (Reference, error) {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return Reference{}, fmt.Errorf("image: empty reference")
+	}
+
+	var out Reference
+
+	if at := strings.Index(ref, "@"); at >= 0 {
+		out.Digest = Digest(ref[at+1:])
+		ref = ref[:at]
+	}
+
+	lastSlash := strings.LastIndex(ref, "/")
+	lastColon := strings.LastIndex(ref, ":")
+	if lastColon > lastSlash {
+		out.Tag = ref[lastColon+1:]
+		ref = ref[:lastColon]
+	}
+	if out.Tag == "" && out.Digest == "" {
+		out.Tag = "latest"
+	}
+
+	parts := strings.Split(ref, "/")
+	if len(parts) == 1 {
+		out.Repository = parts[0]
+		return out, nil
+	}
+
+	first := parts[0]
+	if strings.Contains(first, ".") || strings.Contains(first, ":") || first == "localhost" {
+		out.Registry = first
+		out.Repository = strings.Join(parts[1:], "/")
+	} else {
+		out.Repository = ref
+	}
+
+	if out.Repository == "" {
+		return Reference{}, fmt.Errorf("image: invalid reference %q", ref)
+	}
+	return out, nil
 }
 
-func (s *Service) ServeOCI(ctx context.Context) error {
-	return nil
-}
-
-func (p *Service) Pull(ctx context.Context, dsn string) (string, error) {
-	return "", nil
-}
-
-func (p *Service) Push(ctx context.Context, dsn, id string) error {
-	return nil
-}
-
-func (p *Service) Stat(ctx context.Context, id string) (map[string]any, error) {
-	return nil, nil
-}
-
-func (p *Service) Remove(ctx context.Context, id string) error {
-	return nil
-}
-
-type pullOption struct {
-}
-
-type puller struct {
-}
-
-func (p *puller) Options(drv driver.Driver) []pullOption {
-	// var opt driver.Option
-
-	return nil
-}
-
-// oci/image, oci, oci/driver, pkg/podman, pkg/docker,
-// pkg/podman <- oci, oci/image
-// oci.driver <-
-// oci/image <- oci.driver
-type PodmanDriver struct {
-	conns []oci.Conn
-}
-type conn struct {
-}
-
-type Runtime struct {
-
-}
-
-rt = oci.NewRuntime("podman")
-conn = rt.Open("socket.sock")
-
-
-type Image struct {
-
+func (r Reference) String() string {
+	repo := r.Repository
+	if r.Registry != "" {
+		repo = r.Registry + "/" + repo
+	}
+	if r.Digest != "" {
+		return repo + "@" + string(r.Digest)
+	}
+	if r.Tag != "" {
+		return repo + ":" + r.Tag
+	}
+	return repo
 }
