@@ -141,19 +141,19 @@ func (c *Conn) Pull(ctx context.Context, reference string, options map[string]st
 	query := url.Values{}
 	query.Set("fromImage", reference)
 
-	if platform := strings.TrimSpace(options["platform"]); platform != "" {
+	if platform := strings.TrimSpace(options[oci.OptionPlatform]); platform != "" {
 		query.Set("platform", platform)
 	}
-	if parseBool(options["all_tags"]) {
+	if parseBool(options[oci.OptionAllTags]) {
 		query.Set("allTags", "true")
 	}
-	if parseBool(options["insecure_skip_tls_verify"]) {
+	if parseBool(options[oci.OptionInsecureSkipTLS]) {
 		query.Set("tlsVerify", "false")
 	}
 
 	headers := map[string]string{}
-	username := options["username"]
-	password := options["password"]
+	username := options[oci.OptionUsername]
+	password := options[oci.OptionPassword]
 	if username != "" || password != "" {
 		authRaw, err := json.Marshal(map[string]string{
 			"username": username,
@@ -297,9 +297,9 @@ func (c *Conn) Exec(ctx context.Context, id string, command []string, options ma
 		return nil, fmt.Errorf("podman: command is required")
 	}
 
-	env := toEnvMap(options["env"])
-	tty := toBool(options["tty"])
-	stdin := toBytes(options["stdin"])
+	env := toEnvMap(options[oci.ExecOptionEnv])
+	tty := toBool(options[oci.ExecOptionTTY])
+	stdin := toBytes(options[oci.ExecOptionStdin])
 
 	createBody, err := json.Marshal(map[string]any{
 		"AttachStdin":  len(stdin) > 0,
@@ -372,9 +372,9 @@ func (c *Conn) Exec(ctx context.Context, id string, command []string, options ma
 	}
 
 	return map[string]any{
-		"exit_code": inspect.ExitCode,
-		"stdout":    stdout,
-		"stderr":    stderr,
+		oci.ExecResultExitCode: inspect.ExitCode,
+		oci.ExecResultStdout:   stdout,
+		oci.ExecResultStderr:   stderr,
 	}, nil
 }
 
@@ -403,12 +403,12 @@ func (c *Conn) inspectImage(ctx context.Context, idOrRef string) (map[string]any
 	}
 
 	doc := map[string]any{
-		"kind":      driver.KindImage,
-		"id":        payload.ID,
-		"reference": firstNonEmpty(payload.RepoTags, idOrRef),
-		"digest":    firstDigest(payload.RepoDigests),
+		"kind":       driver.KindImage,
+		"id":         payload.ID,
+		"reference":  firstNonEmpty(payload.RepoTags, idOrRef),
+		"digest":     firstDigest(payload.RepoDigests),
 		"size_bytes": payload.Size,
-		"labels":    payload.Config.Labels,
+		"labels":     payload.Config.Labels,
 	}
 	if created, err := time.Parse(time.RFC3339Nano, payload.Created); err == nil {
 		doc["created_at"] = created.UTC().Format(time.RFC3339Nano)
@@ -454,13 +454,13 @@ func (c *Conn) listImages(ctx context.Context, _ map[string]string) ([]map[strin
 }
 
 func (c *Conn) createContainer(ctx context.Context, spec map[string]any) (string, error) {
-	image := strings.TrimSpace(toString(spec["image"]))
+	image := strings.TrimSpace(toString(spec[oci.SpecImage]))
 	if image == "" {
-		return "", fmt.Errorf("podman: container image is required in spec[\"image\"]")
+		return "", fmt.Errorf("podman: container image is required in spec[%q]", oci.SpecImage)
 	}
 
 	query := url.Values{}
-	if name := strings.TrimSpace(toString(spec["name"])); name != "" {
+	if name := strings.TrimSpace(toString(spec[oci.SpecName])); name != "" {
 		query.Set("name", name)
 	}
 
@@ -468,19 +468,19 @@ func (c *Conn) createContainer(ctx context.Context, spec map[string]any) (string
 		"Image": image,
 	}
 
-	if cmd := toStringSlice(spec["command"]); len(cmd) > 0 {
+	if cmd := toStringSlice(spec[oci.SpecCommand]); len(cmd) > 0 {
 		body["Cmd"] = cmd
 	}
-	if env := toEnvMap(spec["env"]); len(env) > 0 {
+	if env := toEnvMap(spec[oci.SpecEnv]); len(env) > 0 {
 		body["Env"] = envSlice(env)
 	}
-	if labels := toStringMap(spec["labels"]); len(labels) > 0 {
+	if labels := toStringMap(spec[oci.SpecLabels]); len(labels) > 0 {
 		body["Labels"] = labels
 	}
-	if wd := strings.TrimSpace(toString(spec["working_dir"])); wd != "" {
+	if wd := strings.TrimSpace(toString(spec[oci.SpecWorkingDir])); wd != "" {
 		body["WorkingDir"] = wd
 	}
-	if networkMode := strings.TrimSpace(toString(spec["network_mode"])); networkMode != "" {
+	if networkMode := strings.TrimSpace(toString(spec[oci.SpecNetworkMode])); networkMode != "" {
 		body["HostConfig"] = map[string]any{"NetworkMode": networkMode}
 	}
 

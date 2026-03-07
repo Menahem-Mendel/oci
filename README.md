@@ -1,45 +1,20 @@
 # OCI Interface Library
 
-`oci` is a runtime-agnostic interface layer for containers, inspired by `database/sql`.
+`oci` is a runtime-agnostic container interface, modeled after the ergonomics of `database/sql`.
 
-The core packages are **standard library only**:
-- `oci`
-- `oci/driver`
-- `oci/image`
+Core goal:
+- Simple app API in `oci`
+- Complex runtime differences hidden inside adapters
+- Adapter interfaces in `oci/driver` use builtin data types only (`string`, `[]string`, `map[...]...`, `bool`, `int`, `[]byte`, `any`)
 
-Runtime-specific adapters live in subpackages (for example `oci/pkg/podman`) and may use runtime-specific logic.
+## Package Layout
 
-## Architecture
+- `oci`: high-level runtime handle (`Open`, `PullImage`, `CreateContainer`, `ExecInContainer`, ...)
+- `oci/driver`: low-level adapter contracts
+- `oci/image`: OCI image constants/types (stdlib only)
+- `oci/pkg/podman`: Podman adapter implementation
 
-### 1) High-level API (`oci`)
-- Driver registry (`Register`, `Drivers`)
-- Runtime handle (`Open`, `NewRuntime`, `Runtime.Connect`, `Runtime.Close`)
-- Capability discovery (`Runtime.Capabilities()`)
-- Stable operations for images and containers
-
-### 2) Adapter contract (`oci/driver`)
-- `Driver` and `Conn` interfaces
-- Optional capability interfaces (pull image, create container, exec, etc.)
-- Typed request/response structs shared by all adapters
-
-### 3) Runtime adapters (`oci/pkg/...`)
-- Implement `driver.Driver` and one or more optional capability interfaces
-- Register in `init()`
-
-## Standards Mapping
-
-This project intentionally separates concerns because container standards are split:
-
-- OCI Image Spec: image format (`oci/image` data types)
-- OCI Runtime Spec: low-level runtime execution contract (implemented by runtimes like runc/crun)
-- OCI Distribution Spec: registry pull/push transport semantics
-- CRI: Kubernetes runtime contract (outside OCI scope, kubelet-specific)
-- CNI: networking plugin contract (outside OCI image/runtime scope)
-- CDI: device injection contract across runtimes
-
-There is no single ISO standard that unifies all runtime control APIs. The library uses OCI-aligned data models and adapter capabilities to bridge runtime differences.
-
-## Quick Start
+## 60-Second Example
 
 ```go
 package main
@@ -59,53 +34,145 @@ func main() {
 	}
 	defer rt.Close()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
 	if err := rt.Ping(ctx); err != nil {
 		log.Fatal(err)
 	}
 
-	img, err := rt.PullImage(ctx, "docker.io/library/alpine:latest")
+	imageID, err := rt.PullImage(ctx, "docker.io/library/alpine:latest", nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	_, err = rt.CreateContainer(ctx, oci.ContainerSpec{
-		Name:    "demo",
-		Image:   img.Reference,
-		Command: []string{"sh", "-lc", "echo hello"},
+	containerID, err := rt.CreateContainer(ctx, map[string]any{
+		oci.SpecImage:   imageID,
+		oci.SpecCommand: []string{"sh", "-lc", "echo hello"},
 	})
 	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err := rt.StartContainer(ctx, containerID); err != nil {
 		log.Fatal(err)
 	}
 }
 ```
 
-## Implementing A Custom Adapter
+## Common Operations
+
+```go
+// Pull with options
+imageID, _ := rt.PullImage(ctx, "docker.io/library/nginx:latest", map[string]string{
+	oci.OptionPlatform: "linux/amd64",
+})
+
+// Inspect image/container
+img, _ := rt.InspectImage(ctx, imageID)
+ctr, _ := rt.InspectContainer(ctx, "my-container")
+
+// List resources
+images, _ := rt.ListImages(ctx, nil)
+containers, _ := rt.ListContainers(ctx, map[string]string{"all": "1"})
+
+// Exec
+out, _ := rt.ExecInContainer(ctx, "my-container", []string{"/bin/sh", "-lc", "id"}, map[string]any{
+	oci.ExecOptionTTY: false,
+})
+exitCode := out[oci.ExecResultExitCode]
+stdout := out[oci.ExecResultStdout]
+stderr := out[oci.ExecResultStderr]
+
+_ = exitCode
+_ = stdout
+_ = stderr
+```
+
+## Data Conventions
+
+Container spec keys used by `CreateContainer`:
+- `oci.SpecName` (string)
+- `oci.SpecImage` (string, required)
+- `oci.SpecCommand` ([]string)
+- `oci.SpecEnv` (map[string]string)
+- `oci.SpecLabels` (map[string]string)
+- `oci.SpecWorkingDir` (string)
+- `oci.SpecNetworkMode` (string)
+
+Pull option keys used by `PullImage`:
+- `oci.OptionPlatform` (example: `linux/amd64`)
+- `oci.OptionAllTags` (`true`/`false` as string)
+- `oci.OptionInsecureSkipTLS` (`true`/`false` as string)
+- `oci.OptionUsername`
+- `oci.OptionPassword`
+
+Exec option/result keys:
+- options: `oci.ExecOptionEnv`, `oci.ExecOptionTTY`, `oci.ExecOptionStdin`
+- result: `oci.ExecResultExitCode`, `oci.ExecResultStdout`, `oci.ExecResultStderr`
+
+## Driver API (Builtin-Only)
+
+```go
+package driver
+
+type Driver interface {
+	Open(dsn string) (Conn, error)
+}
+
+type Conn interface {
+	Close() error
+}
+
+type Puller interface {
+	Pull(ctx context.Context, reference string, options map[string]string) (string, error)
+}
+
+type Inspector interface {
+	Inspect(ctx context.Context, kind string, idOrRef string) (map[string]any, error)
+}
+
+type Creator interface {
+	Create(ctx context.Context, kind string, spec map[string]any) (string, error)
+}
+```
+
+Adapters can implement only the capabilities they support. `oci.Runtime` checks capability interfaces at runtime and returns `oci.ErrUnsupported` when missing.
+
+## Implementing an Adapter
 
 ```go
 package myruntime
 
 import (
+	"context"
 	"oci"
 	"oci/driver"
 )
 
 type Driver struct{}
-
 type Conn struct{}
 
 func (d *Driver) Open(dsn string) (driver.Conn, error) { return &Conn{}, nil }
 func (c *Conn) Close() error { return nil }
+func (c *Conn) Pull(ctx context.Context, reference string, options map[string]string) (string, error) {
+	return "image-id", nil
+}
 
 func init() {
 	oci.Register("myruntime", &Driver{})
 }
 ```
 
-Then incrementally add optional interfaces from `oci/driver` (such as `ImagePuller` or `ContainerCreator`) as your runtime supports them.
+## Standards Scope
 
-## Project Status
+This library aligns with OCI and related ecosystem standards but does not pretend there is one universal control-plane standard.
 
-Release candidate architecture: stable core API, adapter boundary, and tests for core behavior.
+- OCI Image Spec: image format
+- OCI Runtime Spec: runtime bundle/process model
+- OCI Distribution Spec: registry push/pull API
+- CRI/CNI/CDI: adjacent integration layers used by orchestrators and runtimes
+
+## Status
+
+Refactored architecture with builtin-only driver interfaces, adapter isolation, and passing tests.
